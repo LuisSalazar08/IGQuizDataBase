@@ -21,6 +21,27 @@ namespace BDGameQuiz
             this.WindowState = FormWindowState.Maximized;
         }
 
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.Escape)
+            {
+                DialogResult result = MessageBox.Show(
+                    "Quieres Salir del Juego?",
+                    "Exit",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question
+                );
+
+                if (result == DialogResult.Yes)
+                {
+                    Application.Exit();
+                }
+
+                return true;
+            }
+
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
 
     }
 }
