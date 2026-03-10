@@ -32,6 +32,7 @@ CREATE TABLE `Inciso` (
   `ID_Inc` int,
   `Contenido` varchar(255),
   `Respuesta` boolean,
+  `Tipo_Inciso` varchar(50) DEFAULT 'texto',
   PRIMARY KEY (`ID_Cat`, `ID_Preg`, `ID_Inc`)
 );
 
