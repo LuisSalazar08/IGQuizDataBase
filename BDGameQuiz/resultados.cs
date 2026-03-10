@@ -12,9 +12,31 @@ namespace BDGameQuiz
 {
     public partial class resultados : Form
     {
-        public resultados()
+        int score;
+        int total;
+
+        public resultados(int scoreFinal, int totalPreguntas)
         {
             InitializeComponent();
+
+            score = scoreFinal;
+            total = totalPreguntas;
+            this.WindowState = FormWindowState.Maximized;
+            this.FormBorderStyle = FormBorderStyle.None;
+
+            MostrarResultado();
+        }
+
+        void MostrarResultado()
+        {
+            lblScore.Text = "Score: " + score + " / " + total;
+        }
+
+        private void btnMenu_Click_1(object sender, EventArgs e)
+        {
+            menu m = new menu();
+            m.Show();
+            this.Close();
         }
     }
 }

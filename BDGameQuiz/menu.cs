@@ -43,5 +43,11 @@ namespace BDGameQuiz
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
+        private void button1_Click(object sender, EventArgs e)
+        {
+            juego juegoForm = new juego(1); //El arguemnto se trata de el ID de la categoria
+            juegoForm.Show();
+            this.Hide();
+        }
     }
 }
