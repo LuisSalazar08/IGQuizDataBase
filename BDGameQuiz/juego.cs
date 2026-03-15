@@ -18,12 +18,15 @@ namespace BDGameQuiz
         int score = 0;
         int totalPreguntas = 14;
 
-        public juego(int cat)
+        string nombreJugador;
+
+        public juego(int cat, string nombreJugador)
         {
             InitializeComponent();
             this.WindowState = FormWindowState.Maximized;
             this.FormBorderStyle = FormBorderStyle.None;
             CargarPreguntas();
+            this.nombreJugador = nombreJugador;
         }
 
         void CargarPreguntas()
@@ -78,7 +81,7 @@ namespace BDGameQuiz
 
         void TerminarJuego()
         {
-            resultados r = new resultados(score, preguntas.Count);
+            resultados r = new resultados(score, preguntas.Count, nombreJugador);
             r.Show();
 
             this.Close();

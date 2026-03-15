@@ -12,6 +12,7 @@ namespace BDGameQuiz
 {
     public partial class menu : Form
     {
+
         public menu()
         {
             InitializeComponent();
@@ -45,7 +46,8 @@ namespace BDGameQuiz
 
         private void button1_Click(object sender, EventArgs e)
         {
-            juego juegoForm = new juego(1); //El arguemnto se trata de el ID de la categoria
+            string nombreJugador = nameTextBox.Text;
+            juego juegoForm = new juego(1, nombreJugador); //El arguemnto se trata de el ID de la categoria
             juegoForm.Show();
             this.Hide();
         }

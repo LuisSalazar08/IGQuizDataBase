@@ -38,7 +38,11 @@
             this.button4 = new System.Windows.Forms.Button();
             this.button5 = new System.Windows.Forms.Button();
             this.button7 = new System.Windows.Forms.Button();
+            this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
+            this.NameLabel = new System.Windows.Forms.Label();
+            this.nameTextBox = new System.Windows.Forms.TextBox();
             this.menuPanel.SuspendLayout();
+            this.tableLayoutPanel1.SuspendLayout();
             this.SuspendLayout();
             // 
             // menuPanel
@@ -56,6 +60,7 @@
             this.menuPanel.Controls.Add(this.button4, 2, 2);
             this.menuPanel.Controls.Add(this.button5, 0, 3);
             this.menuPanel.Controls.Add(this.button7, 2, 3);
+            this.menuPanel.Controls.Add(this.tableLayoutPanel1, 1, 1);
             this.menuPanel.Dock = System.Windows.Forms.DockStyle.Fill;
             this.menuPanel.Location = new System.Drawing.Point(0, 0);
             this.menuPanel.Name = "menuPanel";
@@ -89,7 +94,7 @@
             this.categoryLabel.Size = new System.Drawing.Size(260, 90);
             this.categoryLabel.TabIndex = 1;
             this.categoryLabel.Text = "Seleccione Categoria:";
-            this.categoryLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.categoryLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             // 
             // button2
             // 
@@ -169,6 +174,42 @@
             this.button7.Text = "???";
             this.button7.UseVisualStyleBackColor = true;
             // 
+            // tableLayoutPanel1
+            // 
+            this.tableLayoutPanel1.ColumnCount = 1;
+            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 50F));
+            this.tableLayoutPanel1.Controls.Add(this.NameLabel, 0, 0);
+            this.tableLayoutPanel1.Controls.Add(this.nameTextBox, 0, 1);
+            this.tableLayoutPanel1.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.tableLayoutPanel1.Location = new System.Drawing.Point(269, 183);
+            this.tableLayoutPanel1.Name = "tableLayoutPanel1";
+            this.tableLayoutPanel1.RowCount = 2;
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
+            this.tableLayoutPanel1.Size = new System.Drawing.Size(260, 84);
+            this.tableLayoutPanel1.TabIndex = 9;
+            // 
+            // NameLabel
+            // 
+            this.NameLabel.AutoSize = true;
+            this.NameLabel.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.NameLabel.Font = new System.Drawing.Font("Times New Roman", 25.8F, ((System.Drawing.FontStyle)((System.Drawing.FontStyle.Bold | System.Drawing.FontStyle.Italic))), System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.NameLabel.Location = new System.Drawing.Point(3, 0);
+            this.NameLabel.Name = "NameLabel";
+            this.NameLabel.Size = new System.Drawing.Size(254, 42);
+            this.NameLabel.TabIndex = 0;
+            this.NameLabel.Text = "Introduce tu Nombre:";
+            this.NameLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            // 
+            // nameTextBox
+            // 
+            this.nameTextBox.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.nameTextBox.Font = new System.Drawing.Font("Times New Roman", 19.8F, System.Drawing.FontStyle.Italic, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.nameTextBox.Location = new System.Drawing.Point(3, 45);
+            this.nameTextBox.Name = "nameTextBox";
+            this.nameTextBox.Size = new System.Drawing.Size(254, 45);
+            this.nameTextBox.TabIndex = 1;
+            // 
             // menu
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -180,6 +221,8 @@
             this.Text = "GAME QUIZ";
             this.menuPanel.ResumeLayout(false);
             this.menuPanel.PerformLayout();
+            this.tableLayoutPanel1.ResumeLayout(false);
+            this.tableLayoutPanel1.PerformLayout();
             this.ResumeLayout(false);
 
         }
@@ -196,6 +239,9 @@
         private System.Windows.Forms.Button button4;
         private System.Windows.Forms.Button button5;
         private System.Windows.Forms.Button button7;
+        private System.Windows.Forms.TableLayoutPanel tableLayoutPanel1;
+        private System.Windows.Forms.Label NameLabel;
+        private System.Windows.Forms.TextBox nameTextBox;
     }
 }
 

@@ -15,7 +15,7 @@ namespace BDGameQuiz
         int score;
         int total;
 
-        public resultados(int scoreFinal, int totalPreguntas)
+        public resultados(int scoreFinal, int totalPreguntas, string nombreJugador)
         {
             InitializeComponent();
 
