@@ -17,6 +17,28 @@ namespace BDGameQuiz
         int total;
         int idPartidaReciente;
 
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.Escape)
+            {
+                DialogResult result = MessageBox.Show(
+                    "Quieres Salir del Juego?",
+                    "Exit",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question
+                );
+
+                if (result == DialogResult.Yes)
+                {
+                    Application.Exit();
+                }
+
+                return true;
+            }
+
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
         public resultados(int scoreFinal, int totalPreguntas, string nombreJugador, int idPartida)
         {
             InitializeComponent();

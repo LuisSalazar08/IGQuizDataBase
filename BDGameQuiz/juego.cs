@@ -1,20 +1,18 @@
-﻿using System;
+﻿using MySql.Data.MySqlClient;
+using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Drawing;
+using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using MySql.Data.MySqlClient;
-using System.Media;
+using WMPLib;
 
 namespace BDGameQuiz
 {
     public partial class juego : Form
     {
         List<Pregunta> preguntas = new List<Pregunta>();
+        WindowsMediaPlayer player = new WindowsMediaPlayer();
 
         int indicePregunta = 0;
         int score = 0;
@@ -23,6 +21,30 @@ namespace BDGameQuiz
         string nombreJugador;
         int idJugador;
         int idPartida;
+
+        bool audioYaReproducido = false;
+
+        private List<Image> imagenesCargadas = new List<Image>();
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.Escape) 
+            {
+                DialogResult result = MessageBox.Show(
+                    "Quieres Salir del Juego?",
+                    "Exit",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question
+                );
+
+                if (result == DialogResult.Yes)
+                {
+                    Application.Exit();
+                }
+                return true;
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
 
         public juego(int cat, int idJugador, string nombreJugador)
         {
@@ -35,7 +57,48 @@ namespace BDGameQuiz
             this.idJugador = idJugador;
             this.nombreJugador = nombreJugador;
 
+            this.Disposed += Juego_Disposed;
+
             CargarPreguntas();
+        }
+
+        private void Juego_Disposed(object sender, EventArgs e)
+        {
+            LiberarImagenes();
+        }
+
+        private void LiberarImagenes()
+        {
+            foreach (var img in imagenesCargadas)
+            {
+                if (img != null)
+                {
+                    img.Dispose();
+                }
+            }
+            imagenesCargadas.Clear();
+        }
+
+        private void LiberarImagenesBotones()
+        {
+            Button[] botones = { btn1, btn2, btn3, btn4 };
+
+            foreach (var btn in botones)
+            {
+                if (btn.BackgroundImage != null)
+                {
+                    Image img = btn.BackgroundImage;
+                    btn.BackgroundImage = null;
+                    img.Dispose();
+                }
+
+                if (btn.Image != null)
+                {
+                    Image img = btn.Image;
+                    btn.Image = null;
+                    img.Dispose();
+                }
+            }
         }
 
         void MezclarOpciones(Pregunta p)
@@ -66,16 +129,7 @@ namespace BDGameQuiz
                 {
                     conn.Open();
 
-                    // Verificar cuántas preguntas hay en esta categoría
-                    string countQuery = "SELECT COUNT(*) FROM pregunta WHERE ID_Cat = @cat";
-                    MySqlCommand countCmd = new MySqlCommand(countQuery, conn);
-                    countCmd.Parameters.AddWithValue("@cat", idCategoria);
-                    int totalPreguntas = Convert.ToInt32(countCmd.ExecuteScalar());
-
-                    Console.WriteLine($"Total de preguntas en categoría {idCategoria}: {totalPreguntas}");
-
-                    // Obtener preguntas SOLO de la categoría seleccionada
-                    string query = "SELECT * FROM pregunta WHERE ID_Cat = @cat ORDER BY RAND() LIMIT 12";
+                    string query = "SELECT * FROM pregunta WHERE ID_Cat = @cat ORDER BY RAND() LIMIT 14";
                     MySqlCommand cmd = new MySqlCommand(query, conn);
                     cmd.Parameters.AddWithValue("@cat", idCategoria);
 
@@ -84,91 +138,71 @@ namespace BDGameQuiz
                     while (dr.Read())
                     {
                         Pregunta p = new Pregunta();
-
                         p.IdPregunta = Convert.ToInt32(dr["ID_Preg"]);
                         p.Enunciado = dr["Enunciado"].ToString();
                         p.Opciones = new string[4];
                         p.Correcta = -1;
-
                         preguntas.Add(p);
-
-                        Console.WriteLine($"Pregunta cargada: ID={p.IdPregunta}");
                     }
 
                     dr.Close();
 
-                    // Cargar los incisos para cada pregunta
+                    // Cargar los incisos
                     foreach (Pregunta p in preguntas)
                     {
-                        // IMPORTANTE: Filtrar incisos por ID_Preg SOLAMENTE
-                        // Los incisos ya pertenecen a esta pregunta específica
-                        string queryIncisos = @"SELECT * FROM inciso WHERE ID_Preg = @preg ORDER BY ID_Inc";
+                        string queryIncisos = @"SELECT * FROM inciso WHERE ID_Cat = @cat AND ID_Preg = @preg ORDER BY ID_Inc";
 
                         MySqlCommand cmdInc = new MySqlCommand(queryIncisos, conn);
                         cmdInc.Parameters.AddWithValue("@preg", p.IdPregunta);
+                        cmdInc.Parameters.AddWithValue("@cat", idCategoria);
 
                         MySqlDataReader drInc = cmdInc.ExecuteReader();
 
                         int indiceOpcion = 0;
-                        string tipoDetectado = "texto"; // Valor por defecto
+                        string tipoDetectado = "texto";
 
                         while (drInc.Read() && indiceOpcion < 4)
                         {
-                            // Asignar contenido
                             p.Opciones[indiceOpcion] = drInc["Contenido"].ToString();
 
-                            // Verificar si es respuesta correcta
                             if (Convert.ToBoolean(drInc["Respuesta"]))
                                 p.Correcta = indiceOpcion;
 
-                            // Detectar el tipo del primer inciso
                             if (indiceOpcion == 0)
-                            {
                                 tipoDetectado = drInc["Tipo_Inciso"].ToString();
-                            }
 
                             indiceOpcion++;
                         }
 
                         drInc.Close();
-
-                        // Asignar el tipo detectado a la pregunta
                         p.Tipo = tipoDetectado;
 
-                        // Verificar que tenemos las 4 opciones
+                        // Validar opciones nulas
                         for (int i = 0; i < 4; i++)
                         {
                             if (string.IsNullOrEmpty(p.Opciones[i]))
                                 p.Opciones[i] = "Opción no disponible";
                         }
 
-                        // Verificar que se encontró una respuesta correcta
+                        // Validar respuesta correcta
                         if (p.Correcta == -1)
                         {
-                            p.Correcta = 0; // Asignar primera opción por defecto
+                            p.Correcta = 0;
                             Console.WriteLine($"ADVERTENCIA: Pregunta {p.IdPregunta} sin respuesta correcta");
                         }
-
-                        // Mezclar opciones SOLO si es tipo texto
-                        // Para imágenes y audios no mezclamos porque podrían tener referencias específicas
-                        if (p.Tipo == "texto")
-                        {
-                            MezclarOpciones(p);
-                        }
-
-                        Console.WriteLine($"Pregunta {p.IdPregunta} cargada con tipo: {p.Tipo}");
+                        
+                        MezclarOpciones(p);
+                        
                     }
                 }
 
-                // Verificar que hay preguntas cargadas
+                // Verificar preguntas cargadas
                 if (preguntas.Count == 0)
                 {
                     MessageBox.Show($"No hay preguntas disponibles para esta categoría (ID: {idCategoria}).");
                     btnMenu_Click_1(null, null);
                     return;
                 }
-
-                Console.WriteLine($"Total de preguntas cargadas: {preguntas.Count}");
 
                 indicePregunta = 0;
                 score = 0;
@@ -180,6 +214,57 @@ namespace BDGameQuiz
             }
         }
 
+        Image CargarImagen(string ruta)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(ruta) || !File.Exists(ruta))
+                {
+                    Console.WriteLine($"Archivo no encontrado: {ruta}");
+                    return null;
+                }
+
+                // Verificar extensión
+                string extension = Path.GetExtension(ruta).ToLower();
+                if (extension != ".jpg" && extension != ".jpeg" && extension != ".png" && extension != ".bmp" && extension != ".gif")
+                {
+                    Console.WriteLine($"Formato no soportado: {extension}");
+                    return null;
+                }
+
+                using (var fs = new FileStream(ruta, FileMode.Open, FileAccess.Read))
+                {
+                    Image img = Image.FromStream(fs);
+
+                    Bitmap copia = new Bitmap(img);
+
+                    imagenesCargadas.Add(copia);
+
+                    return copia;
+                }
+            }
+            catch (OutOfMemoryException ex)
+            {
+                Console.WriteLine($"Error de memoria al cargar imagen {ruta}: {ex.Message}");
+
+                try
+                {
+                    Image img = Image.FromFile(ruta);
+                    imagenesCargadas.Add(img);
+                    return img;
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error al cargar imagen {ruta}: {ex.Message}");
+                return null;
+            }
+        }
+
         void MostrarPregunta()
         {
             if (indicePregunta >= preguntas.Count)
@@ -188,91 +273,173 @@ namespace BDGameQuiz
                 return;
             }
 
-            var p = preguntas[indicePregunta];
+            audioYaReproducido = false;
+            LiberarImagenesBotones();
 
+            var p = preguntas[indicePregunta];
             lblPregunta.Text = p.Enunciado;
 
-            // Limpiar botones
-            btn1.Text = "";
-            btn2.Text = "";
-            btn3.Text = "";
-            btn4.Text = "";
+            btn1.AccessibleDescription = null;
+            btn2.AccessibleDescription = null;
+            btn3.AccessibleDescription = null;
+            btn4.AccessibleDescription = null;
 
-            btn1.Image = null;
-            btn2.Image = null;
-            btn3.Image = null;
-            btn4.Image = null;
+            btn1.Enabled = btn2.Enabled = btn3.Enabled = btn4.Enabled = false;
 
-            // Habilitar todos los botones por defecto
-            btn1.Enabled = true;
-            btn2.Enabled = true;
-            btn3.Enabled = true;
-            btn4.Enabled = true;
-
-            // Mostrar opciones según el tipo
-            if (p.Tipo == "texto")
+            Timer timer = new Timer();
+            timer.Interval = 50;
+            timer.Tick += (s, e) =>
             {
-                // Para texto, mostramos el texto normalmente
-                btn1.Text = p.Opciones[0];
-                btn2.Text = p.Opciones[1];
-                btn3.Text = p.Opciones[2];
-                btn4.Text = p.Opciones[3];
-            }
-            else if (p.Tipo == "imagen")
-            {
-                // Para imágenes, mostramos un placeholder
-                btn1.Text = "🖼️ " + p.Opciones[0];
-                btn2.Text = "🖼️ " + p.Opciones[1];
-                btn3.Text = "🖼️ " + p.Opciones[2];
-                btn4.Text = "🖼️ " + p.Opciones[3];
+                timer.Stop();
+                timer.Dispose();
 
-                // Aquí eventualmente cargarías las imágenes
-                // Por ahora mostramos solo el texto
-            }
-            else if (p.Tipo == "audio")
-            {
-                // Para audio, mostramos un placeholder
-                btn1.Text = "🔊 " + p.Opciones[0];
-                btn2.Text = "🔊 " + p.Opciones[1];
-                btn3.Text = "🔊 " + p.Opciones[2];
-                btn4.Text = "🔊 " + p.Opciones[3];
-            }
-            else
-            {
-                // Tipo desconocido, mostrar como texto
-                btn1.Text = p.Opciones[0];
-                btn2.Text = p.Opciones[1];
-                btn3.Text = p.Opciones[2];
-                btn4.Text = p.Opciones[3];
-            }
+                try
+                {
+                    ConfigurarBoton(btn1, p.Opciones[0], p.Tipo);
+                    ConfigurarBoton(btn2, p.Opciones[1], p.Tipo);
+                    ConfigurarBoton(btn3, p.Opciones[2], p.Tipo);
+                    ConfigurarBoton(btn4, p.Opciones[3], p.Tipo);
 
-            // Mostrar el tipo de pregunta en algún lado (opcional, para depuración)
+                    btn1.Enabled = btn2.Enabled = btn3.Enabled = btn4.Enabled = true;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Error al configurar botones: " + ex.Message);
+                }
+            };
+            timer.Start();
+
             this.Text = $"Juego - Categoría: {idCategoria} - Pregunta {indicePregunta + 1}/{preguntas.Count} - Tipo: {p.Tipo}";
+        }
+
+        void ConfigurarBoton(Button btn, string opcion, string tipo)
+        {
+            btn.Text = "";
+            btn.Image = null;
+            btn.BackgroundImage = null;
+            btn.Tag = opcion;
+
+            if (tipo == "texto")
+            {
+                btn.Text = opcion;
+            }
+            else if (tipo == "imagen")
+            {
+                Image img = CargarImagen(opcion);
+                if (img != null)
+                {
+                    btn.BackgroundImage = img;
+                    btn.BackgroundImageLayout = ImageLayout.Zoom;
+                }
+                else
+                {
+                    btn.Text = "Error al cargar imagen";
+                    btn.BackColor = Color.LightCoral;
+                }
+            }
+            else if (tipo == "audio")
+            {
+                int numero = 0;
+
+                if (btn == btn1) numero = 1;
+                else if (btn == btn2) numero = 2;
+                else if (btn == btn3) numero = 3;
+                else if (btn == btn4) numero = 4;
+
+                btn.Text = $"🔊 Audio {numero}";
+            }
+        }
+
+        void ManejarClick(int opcion, Button btn)
+        {
+            var p = preguntas[indicePregunta];
+
+            if (p.Tipo == "audio")
+            {
+                string archivo = btn.Tag.ToString();
+
+                if (btn.AccessibleDescription != "ya")
+                {
+                    try
+                    {
+                        if (File.Exists(archivo))
+                        {
+                            player.controls.stop();
+                            player.URL = archivo;
+                            player.controls.play();
+                            btn.BackColor = Color.LightBlue;
+
+                            btn.AccessibleDescription = "ya";
+                            btn.Text += " Click para Responder";
+
+                            return;
+                        }
+                        else
+                        {
+                            MessageBox.Show("Archivo de audio no encontrado");
+                            return;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Error al reproducir audio: " + ex.Message);
+                        return;
+                    }
+                }
+            }
+
+            Responder(opcion);
         }
 
         void Responder(int opcion)
         {
+            player.controls.stop();
+
             if (opcion >= 0 && opcion < 4 && indicePregunta < preguntas.Count)
             {
                 var preguntaActual = preguntas[indicePregunta];
 
-                // Verificar si la opción seleccionada es la correcta
+                Button[] botones = { btn1, btn2, btn3, btn4 };
+
                 if (opcion == preguntaActual.Correcta)
                 {
+                    botones[opcion].BackColor = Color.LightGreen;
                     score++;
-                    Console.WriteLine($"¡Correcto! Score: {score}");
                 }
                 else
                 {
-                    Console.WriteLine($"Incorrecto. La correcta era: {preguntaActual.Correcta + 1}");
+                    botones[opcion].BackColor = Color.LightCoral;
+                    if (preguntaActual.Correcta >= 0 && preguntaActual.Correcta < 4)
+                    {
+                        botones[preguntaActual.Correcta].BackColor = Color.LightGreen;
+                    }
                 }
 
-                indicePregunta++;
+                foreach (var btn in botones)
+                {
+                    btn.Enabled = false;
+                }
 
-                if (indicePregunta < preguntas.Count)
-                    MostrarPregunta();
-                else
-                    TerminarJuego();
+                Timer timer = new Timer();
+                timer.Interval = 800;
+                timer.Tick += (s, e) =>
+                {
+                    timer.Stop();
+                    timer.Dispose();
+
+                    foreach (var btn in botones)
+                    {
+                        btn.BackColor = SystemColors.Control;
+                    }
+
+                    indicePregunta++;
+
+                    if (indicePregunta < preguntas.Count)
+                        MostrarPregunta();
+                    else
+                        TerminarJuego();
+                };
+                timer.Start();
             }
         }
 
@@ -284,16 +451,15 @@ namespace BDGameQuiz
                 {
                     conn.Open();
 
-                    string query = @"INSERT INTO partida (ID_Jugador, ID_Cat, Puntaje, Fecha, Hora) VALUES (@jugador,@cat,@score,CURDATE(),CURTIME())";
+                    string query = @"INSERT INTO partida (ID_Jugador, ID_Cat, Puntaje, Fecha, Hora) 
+                                    VALUES (@jugador,@cat,@score,CURDATE(),CURTIME())";
 
                     MySqlCommand cmd = new MySqlCommand(query, conn);
-
                     cmd.Parameters.AddWithValue("@jugador", idJugador);
                     cmd.Parameters.AddWithValue("@cat", idCategoria);
                     cmd.Parameters.AddWithValue("@score", score);
 
                     cmd.ExecuteNonQuery();
-
                     idPartida = (int)cmd.LastInsertedId;
                 }
             }
@@ -306,6 +472,9 @@ namespace BDGameQuiz
 
         void TerminarJuego()
         {
+            LiberarImagenes();
+            player.controls.stop();
+
             GuardarPartida();
 
             resultados r = new resultados(score, preguntas.Count, nombreJugador, idPartida);
@@ -316,26 +485,29 @@ namespace BDGameQuiz
 
         private void btn1_Click(object sender, EventArgs e)
         {
-            Responder(0);
+            ManejarClick(0, btn1);
         }
 
         private void btn2_Click(object sender, EventArgs e)
         {
-            Responder(1);
+            ManejarClick(1, btn2);
         }
 
         private void btn3_Click(object sender, EventArgs e)
         {
-            Responder(2);
+            ManejarClick(2, btn3);
         }
 
         private void btn4_Click(object sender, EventArgs e)
         {
-            Responder(3);
+            ManejarClick(3, btn4);
         }
 
         private void btnMenu_Click_1(object sender, EventArgs e)
         {
+            LiberarImagenes();
+            player.controls.stop();
+
             menu m = new menu();
             m.Show();
             this.Close();
