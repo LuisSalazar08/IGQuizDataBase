@@ -73,7 +73,7 @@ namespace BDGameQuiz
         {
             try
             {
-                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
+                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=RootRoot;"))
                 {
                     conn.Open();
 
@@ -128,8 +128,8 @@ namespace BDGameQuiz
 
         private void btnMenu_Click_1(object sender, EventArgs e)
         {
-            menu m = new menu();
-            m.Show();
+            Inicio i = new Inicio();
+            i.Show();
             this.Close();
         }
 

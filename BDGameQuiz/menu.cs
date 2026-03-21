@@ -13,6 +13,9 @@ namespace BDGameQuiz
 {
     public partial class menu : Form
     {
+        string nombreJugador;
+        int idJugador;
+
         class Categoria
         {
             public int Id;
@@ -24,12 +27,15 @@ namespace BDGameQuiz
         Button[] botonesCategorias;
 
 
-        public menu()
+        public menu(string nombre, int id)
         {
             InitializeComponent();
 
             this.WindowState = FormWindowState.Maximized;
             this.FormBorderStyle = FormBorderStyle.None;
+
+            nombreJugador = nombre;
+            idJugador = id;
 
             botonesCategorias = new Button[]
             {
@@ -41,7 +47,7 @@ namespace BDGameQuiz
 
         void CargarCategorias()
         {
-            using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
+            using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=RootRoot;"))
             {
                 conn.Open();
 
@@ -65,75 +71,17 @@ namespace BDGameQuiz
             }
         }
 
-        int ObtenerIdJugador(string nombre)
-        {
-            int id = 0;
-
-            using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
-            {
-                conn.Open();
-
-                string query = "SELECT ID_Jugador FROM jugador WHERE Nombre=@nombre";
-
-                MySqlCommand cmd = new MySqlCommand(query, conn);
-                cmd.Parameters.AddWithValue("@nombre", nombre);
-
-                id = Convert.ToInt32(cmd.ExecuteScalar());
-            }
-
-            return id;
-        }
-
         void Categoria_Click(object sender, EventArgs e)
         {
             Button b = sender as Button;
 
             int idCategoria = (int)b.Tag;
-            string nombreJugador = nameTextBox.Text;
-            int idJugador = ObtenerIdJugador(nombreJugador);
-
-            if (nameTextBox.Text.Trim() == "")
-            {
-                MessageBox.Show("Por favor ingresa tu nombre antes de comenzar.",
-                                "Nombre requerido",
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Warning);
-
-                nameTextBox.Focus();
-                return;
-            }
-
-            GuardarJugador(nombreJugador);
 
             juego j = new juego(idCategoria, idJugador, nombreJugador);
 
             j.Show();
 
             this.Hide();
-        }
-
-        void GuardarJugador(string nombre)
-        {
-            using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
-            {
-                conn.Open();
-
-                string check = "SELECT COUNT(*) FROM jugador WHERE Nombre = @nombre";
-
-                MySqlCommand cmd = new MySqlCommand(check, conn);
-                cmd.Parameters.AddWithValue("@nombre", nombre);
-
-                int existe = Convert.ToInt32(cmd.ExecuteScalar());
-
-                if (existe == 0)
-                {
-                    string insert = "INSERT INTO jugador (Nombre) VALUES (@nombre)";
-
-                    MySqlCommand cmdInsert = new MySqlCommand(insert, conn);
-                    cmdInsert.Parameters.AddWithValue("@nombre", nombre);
-                    cmdInsert.ExecuteNonQuery();
-                }
-            }
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
@@ -164,6 +112,11 @@ namespace BDGameQuiz
         }
 
         private void nameTextBox_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void menu_Load(object sender, EventArgs e)
         {
 
         }
