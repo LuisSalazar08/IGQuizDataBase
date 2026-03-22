@@ -58,9 +58,9 @@ namespace BDGameQuiz
         {
             string nombreJugador = nameTextBox.Text;
 
-            int idJugador = ObtenerIdJugador(nombreJugador);
+            int idJugador = GuardarJ(nombreJugador);
 
-            GuardarJugador(nombreJugador);
+            GuardarJ(nombreJugador);
 
             menu m = new menu(nombreJugador, idJugador);
 
@@ -93,24 +93,53 @@ namespace BDGameQuiz
             {
                 conn.Open();
 
-                string check = "SELECT COUNT(*) FROM jugador WHERE Nombre = @nombre";
-
-                MySqlCommand cmd = new MySqlCommand(check, conn);
+                string insert = "INSERT INTO jugador (Nombre) VALUES (@nombre)";
+                MySqlCommand cmd = new MySqlCommand(insert, conn);
                 cmd.Parameters.AddWithValue("@nombre", nombre);
 
-                int existe = Convert.ToInt32(cmd.ExecuteScalar());
-
-                if (existe == 0)
-                {
-                    string insert = "INSERT INTO jugador (Nombre) VALUES (@nombre)";
-
-                    MySqlCommand cmdInsert = new MySqlCommand(insert, conn);
-                    cmdInsert.Parameters.AddWithValue("@nombre", nombre);
-                    cmdInsert.ExecuteNonQuery();
-                }
+                cmd.ExecuteNonQuery();
             }
         }
 
+        int GuardarJ(string nombre)
+        {
+            int id = BuscarJugador(nombre);
+
+            if (id == 0)
+            {
+                GuardarJugador(nombre);
+
+                // 🔥 volver a buscar después de insertar
+                id = BuscarJugador(nombre);
+            }
+
+            return id;
+
+        }
+
+        int BuscarJugador(string nombre)
+        {
+            int id = 0;
+
+            using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=RootRoot;"))
+            {
+                conn.Open();
+
+                string query = "SELECT ID_Jugador FROM jugador WHERE Nombre=@nombre LIMIT 1";
+
+                MySqlCommand cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@nombre", nombre);
+
+                object result = cmd.ExecuteScalar();
+
+                if (result != null && result != DBNull.Value)
+                {
+                    id = Convert.ToInt32(result);
+                }
+            }
+
+            return id;
+        }
 
         private void nameTextBox_TextChanged(object sender, EventArgs e)
         {
