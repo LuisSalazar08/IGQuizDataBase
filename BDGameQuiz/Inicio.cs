@@ -57,10 +57,10 @@ namespace BDGameQuiz
         private void button1_Click(object sender, EventArgs e)
         {
             string nombreJugador = nameTextBox.Text;
-
+            GuardarJugador(nombreJugador);
             int idJugador = ObtenerIdJugador(nombreJugador);
 
-            GuardarJugador(nombreJugador);
+
 
             menu m = new menu(nombreJugador, idJugador);
 
