@@ -19,6 +19,7 @@ namespace BDGameQuiz
 
             this.WindowState = FormWindowState.Maximized;
             this.FormBorderStyle = FormBorderStyle.None;
+            this.BackgroundImage = global::BDGameQuiz.Properties.Resources.fondo;
 
             button1.Enabled = false;
         }

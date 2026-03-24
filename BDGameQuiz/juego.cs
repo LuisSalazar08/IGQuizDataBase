@@ -22,6 +22,8 @@ namespace BDGameQuiz
         private int idJugador;
         private int idPartida;
 
+        private Image fondoActual;
+
         private bool audioYaReproducido = false;
         private int? indiceSeleccionado = null;
         private int? indiceAudioPrevisualizado = null;
@@ -34,10 +36,10 @@ namespace BDGameQuiz
         private readonly Rectangle[] rectOpciones = new Rectangle[4];
         private Rectangle hoverRect = Rectangle.Empty;
 
-        private readonly Font fontPregunta = new Font("Times New Roman", 30, FontStyle.Italic);
-        private readonly Font fontOpcion = new Font("Times New Roman", 20, FontStyle.Italic);
-        private readonly Font fontOpcionAudio = new Font("Times New Roman", 18, FontStyle.Italic);
-        private readonly Font fontError = new Font("Arial", 14, FontStyle.Bold);
+        private readonly Font fontPregunta = new Font("Times New Roman", 40, FontStyle.Italic);
+        private readonly Font fontOpcion = new Font("Times New Roman", 16, FontStyle.Italic);
+        private readonly Font fontOpcionAudio = new Font("Times New Roman", 16, FontStyle.Italic);
+        private readonly Font fontError = new Font("Arial", 13, FontStyle.Bold);
 
         private static readonly Random rnd = new Random();
 
@@ -56,11 +58,28 @@ namespace BDGameQuiz
 
             this.Controls.Clear();
 
+            fondoActual = ObtenerFondoPorCategoria();
+
             this.Load += Juego_Load;
             this.Resize += Juego_Resize;
             this.Disposed += Juego_Disposed;
 
             CargarPreguntas();
+        }
+
+        private Image ObtenerFondoPorCategoria()
+        {
+            switch (idCategoria)
+            {
+                case 1: return Properties.Resources.fondo_historia;
+                case 2: return Properties.Resources.fondo_geografia;
+                case 3: return Properties.Resources.fondo_cultura;
+                case 4: return Properties.Resources.fondo_gastronomia;
+                case 5: return Properties.Resources.fondo_arte;
+                case 6: return Properties.Resources.fondo_deportes;
+                case 7: return Properties.Resources.fondo_naturaleza;
+                default: return Properties.Resources.fondo;
+            }
         }
 
         private void Juego_Load(object sender, EventArgs e)
@@ -108,27 +127,33 @@ namespace BDGameQuiz
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
-        private void CalcularLayout()
+        void CalcularLayout()
         {
             int w = this.ClientSize.Width;
             int h = this.ClientSize.Height;
 
-            int margen = 12;
-            int altoPregunta = 130;
-            int separacion = 10;
+            int margen = 30;
+            int separacion = 25;
+
+            int offsetY = (int)(h * 0.08); // 8% hacia abajo
+
+            int altoPregunta = 140;
 
             rectPregunta = new Rectangle(
                 margen,
-                margen + 10,
+                margen + offsetY,
                 w - (margen * 2),
                 altoPregunta
             );
 
-            int areaOpcionesY = rectPregunta.Bottom + 25;
+            int espacioPreguntaOpciones = 50;
+
+            int areaOpcionesY = rectPregunta.Bottom + espacioPreguntaOpciones;
             int areaOpcionesAlto = h - areaOpcionesY - margen;
 
             int anchoOpcion = (w - (margen * 2) - separacion) / 2;
-            int altoOpcion = (areaOpcionesAlto - separacion) / 2;
+
+            int altoOpcion = Math.Min(180, (areaOpcionesAlto - separacion) / 2);
 
             rectOpciones[0] = new Rectangle(margen, areaOpcionesY, anchoOpcion, altoOpcion);
             rectOpciones[1] = new Rectangle(margen + anchoOpcion + separacion, areaOpcionesY, anchoOpcion, altoOpcion);
@@ -360,7 +385,20 @@ namespace BDGameQuiz
             base.OnPaint(e);
 
             Graphics g = e.Graphics;
-            g.Clear(Color.FromArgb(194, 255, 194));
+
+            if (fondoActual != null)
+            {
+                g.DrawImage(fondoActual, new Rectangle(0, 0, this.ClientSize.Width, this.ClientSize.Height));
+            }
+            else
+            {
+                g.Clear(Color.FromArgb(194, 255, 194));
+            }
+
+            using (Brush overlay = new SolidBrush(Color.FromArgb(80, 0, 0, 0)))
+            {
+                g.FillRectangle(overlay, this.ClientRectangle);
+            }
 
             if (preguntas == null || preguntas.Count == 0 || indicePregunta >= preguntas.Count)
                 return;
@@ -373,19 +411,16 @@ namespace BDGameQuiz
                 LineAlignment = StringAlignment.Center
             };
 
-            StringFormat sfIzq = new StringFormat
+            using (Brush bgPregunta = new SolidBrush(Color.FromArgb(185, 255, 255, 255)))
             {
-                Alignment = StringAlignment.Near,
-                LineAlignment = StringAlignment.Center
-            };
+                g.FillRectangle(bgPregunta, rectPregunta);
+            }
 
-            StringFormat sfCentroArriba = new StringFormat
+            using (Pen penPregunta = new Pen(Color.FromArgb(140, 0, 0, 0), 2))
             {
-                Alignment = StringAlignment.Center,
-                LineAlignment = StringAlignment.Near
-            };
+                g.DrawRectangle(penPregunta, rectPregunta);
+            }
 
-            // Pregunta
             g.DrawString(
                 p.Enunciado,
                 fontPregunta,
@@ -394,21 +429,20 @@ namespace BDGameQuiz
                 sfCentro
             );
 
-            // Opciones
             for (int i = 0; i < 4; i++)
             {
-                DibujarOpcion(g, p, i, sfCentro, sfIzq);
+                DibujarOpcion(g, p, i, sfCentro);
             }
         }
 
-        private void DibujarOpcion(Graphics g, Pregunta p, int i, StringFormat sfCentro, StringFormat sfIzq)
+        private void DibujarOpcion(Graphics g, Pregunta p, int i, StringFormat sfCentro)
         {
             Rectangle rect = rectOpciones[i];
 
-            Color fondo = Color.WhiteSmoke;
+            Color fondo = Color.FromArgb(205, Color.White);
 
             if (hoverRect == rect)
-                fondo = Color.Gainsboro;
+                fondo = Color.FromArgb(225, Color.LightGray);
 
             if (indiceSeleccionado.HasValue)
             {
@@ -425,7 +459,7 @@ namespace BDGameQuiz
 
             g.DrawRectangle(Pens.Black, rect);
 
-            Rectangle inner = new Rectangle(rect.X + 10, rect.Y + 10, rect.Width - 20, rect.Height - 20);
+            Rectangle inner = new Rectangle(rect.X + 8, rect.Y + 8, rect.Width - 16, rect.Height - 16);
 
             if (p.Tipo == "texto")
             {
@@ -544,15 +578,13 @@ namespace BDGameQuiz
             if (indicePregunta >= preguntas.Count)
                 return;
 
-            var p = preguntas[indicePregunta];
-
             for (int i = 0; i < rectOpciones.Length; i++)
             {
-                if (!rectOpciones[i].Contains(e.Location))
-                    continue;
-
-                ManejarClick(i);
-                break;
+                if (rectOpciones[i].Contains(e.Location))
+                {
+                    ManejarClick(i);
+                    break;
+                }
             }
         }
 
@@ -682,6 +714,7 @@ namespace BDGameQuiz
 
             menu m = new menu(nombreJugador, idJugador);
             m.Show();
+
             this.Close();
         }
     }

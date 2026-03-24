@@ -1,8 +1,10 @@
-﻿using System;
+﻿using MySql.Data.MySqlClient;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.Windows.Forms;
-using MySql.Data.MySqlClient;
 
 namespace BDGameQuiz
 {
@@ -27,30 +29,76 @@ namespace BDGameQuiz
 
         Rectangle hoverRect = Rectangle.Empty;
 
+        Image flechaImg;
+        Image fondoCache;
+
+        Font fontTitulo = new Font("Times New Roman", 48, FontStyle.Bold);
+        Font fontCategoria = new Font("Times New Roman", 36, FontStyle.Bold);
+
+        StringFormat sfCentro = new StringFormat()
+        {
+            Alignment = StringAlignment.Center,
+            LineAlignment = StringAlignment.Center
+        };
+
         public menu(string nombre, int id)
         {
             InitializeComponent();
 
             this.WindowState = FormWindowState.Maximized;
             this.FormBorderStyle = FormBorderStyle.None;
+
+            this.SetStyle(ControlStyles.AllPaintingInWmPaint |
+                          ControlStyles.UserPaint |
+                          ControlStyles.OptimizedDoubleBuffer, true);
+
             this.DoubleBuffered = true;
+            this.KeyPreview = true;
 
             nombreJugador = nombre;
             idJugador = id;
 
             this.Controls.Clear();
 
-            this.Load += (s, e) => {
+            flechaImg = Properties.Resources.flecha;
+
+            fondoCache = CrearFondoConOpacidad(Properties.Resources.fondo, 0.9f);
+
+            this.Load += (s, e) =>
+            {
                 CalcularRectangulos();
                 this.Invalidate();
             };
 
-            this.Resize += (s, e) => {
+            this.Resize += (s, e) =>
+            {
                 CalcularRectangulos();
                 this.Invalidate();
             };
 
             CargarCategorias();
+        }
+
+        Image CrearFondoConOpacidad(Image original, float opacidad)
+        {
+            Bitmap bmp = new Bitmap(original.Width, original.Height);
+
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                ColorMatrix matrix = new ColorMatrix();
+                matrix.Matrix33 = opacidad;
+
+                ImageAttributes attributes = new ImageAttributes();
+                attributes.SetColorMatrix(matrix);
+
+                g.DrawImage(original,
+                    new Rectangle(0, 0, bmp.Width, bmp.Height),
+                    0, 0, original.Width, original.Height,
+                    GraphicsUnit.Pixel,
+                    attributes);
+            }
+
+            return bmp;
         }
 
         void CargarCategorias()
@@ -63,15 +111,17 @@ namespace BDGameQuiz
 
                 string query = "SELECT * FROM categoria LIMIT 7";
                 MySqlCommand cmd = new MySqlCommand(query, conn);
-                MySqlDataReader dr = cmd.ExecuteReader();
 
-                while (dr.Read())
+                using (MySqlDataReader dr = cmd.ExecuteReader())
                 {
-                    categorias.Add(new Categoria
+                    while (dr.Read())
                     {
-                        Id = Convert.ToInt32(dr["ID_Cat"]),
-                        Nombre = dr["Nombre"].ToString()
-                    });
+                        categorias.Add(new Categoria
+                        {
+                            Id = Convert.ToInt32(dr["ID_Cat"]),
+                            Nombre = dr["Nombre"].ToString()
+                        });
+                    }
                 }
             }
 
@@ -89,28 +139,34 @@ namespace BDGameQuiz
             int w = this.ClientSize.Width;
             int h = this.ClientSize.Height;
 
-            int anchoCentro = 400;
-            int altoCentro = 150;
+            int anchoCentro = 560;
+            int altoCentro = 200;
+
+            int posYCentro = (int)(h * 0.55) - (altoCentro / 2);
 
             rectCentro = new Rectangle(
                 (w - anchoCentro) / 2,
-                (h - altoCentro) / 2,
+                posYCentro,
                 anchoCentro,
                 altoCentro
             );
 
+            int anchoFlecha = 110;
+            int altoFlecha = 200;
+            int separacion = 18;
+
             rectIzquierda = new Rectangle(
-                rectCentro.Left - 80,
+                rectCentro.Left - separacion - anchoFlecha,
                 rectCentro.Top,
-                60,
-                altoCentro
+                anchoFlecha,
+                altoFlecha
             );
 
             rectDerecha = new Rectangle(
-                rectCentro.Right + 20,
+                rectCentro.Right + separacion,
                 rectCentro.Top,
-                60,
-                altoCentro
+                anchoFlecha,
+                altoFlecha
             );
         }
 
@@ -119,58 +175,95 @@ namespace BDGameQuiz
             base.OnPaint(e);
 
             Graphics g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
 
-            g.Clear(Color.Turquoise);
+            g.DrawImage(fondoCache,
+                new Rectangle(0, 0, this.ClientSize.Width, this.ClientSize.Height));
 
-            if (categorias == null || categorias.Count == 0)
+            if (categorias.Count == 0)
                 return;
-
-            StringFormat sf = new StringFormat()
-            {
-                Alignment = StringAlignment.Center,
-                LineAlignment = StringAlignment.Center
-            };
 
             int w = this.ClientSize.Width;
 
-            g.DrawString("Seleccione Categoria:",
-                new Font("Times New Roman", 32, FontStyle.Italic),
+            g.DrawString(
+                "Seleccione Categoria:",
+                fontTitulo,
                 Brushes.Black,
-                new Rectangle(0, 50, w, 100),
-                sf);
+                new Rectangle(0, 90, w, 120),
+                sfCentro
+            );
+
+            using (Brush sombra = new SolidBrush(Color.FromArgb(35, Color.Black)))
+            {
+                g.FillRectangle(sombra,
+                    new Rectangle(rectCentro.X + 6, rectCentro.Y + 6, rectCentro.Width, rectCentro.Height));
+            }
 
             Brush brushCentro = (hoverRect == rectCentro) ? Brushes.LightGray : Brushes.WhiteSmoke;
 
             g.FillRectangle(brushCentro, rectCentro);
             g.DrawRectangle(Pens.Black, rectCentro);
 
-            g.DrawString(categorias[indiceActual].Nombre,
-                new Font("Times New Roman", 22, FontStyle.Italic),
+            g.DrawString(
+                categorias[indiceActual].Nombre,
+                fontCategoria,
                 Brushes.Black,
                 rectCentro,
-                sf);
+                sfCentro
+            );
 
-            Brush brushIzq = (hoverRect == rectIzquierda) ? Brushes.LightGray : Brushes.WhiteSmoke;
+            DibujarFlecha(g, rectIzquierda, hoverRect == rectIzquierda, true);
+            DibujarFlecha(g, rectDerecha, hoverRect == rectDerecha, false);
+        }
 
-            g.FillRectangle(brushIzq, rectIzquierda);
-            g.DrawRectangle(Pens.Black, rectIzquierda);
+        void DibujarFlecha(Graphics g, Rectangle rect, bool hover, bool izquierda)
+        {
+            if (flechaImg == null) return;
 
-            g.DrawString("<",
-                new Font("Arial", 30, FontStyle.Bold),
-                Brushes.Black,
-                rectIzquierda,
-                sf);
+            if (hover)
+            {
+                using (Brush glow = new SolidBrush(Color.FromArgb(35, Color.White)))
+                {
+                    g.FillEllipse(glow, rect.X - 8, rect.Y - 8, rect.Width + 16, rect.Height + 16);
+                }
 
-            Brush brushDer = (hoverRect == rectDerecha) ? Brushes.LightGray : Brushes.WhiteSmoke;
+                this.Cursor = Cursors.Hand;
+            }
 
-            g.FillRectangle(brushDer, rectDerecha);
-            g.DrawRectangle(Pens.Black, rectDerecha);
+            Rectangle drawRect = hover ? Rectangle.Inflate(rect, -8, -8) : rect;
 
-            g.DrawString(">",
-                new Font("Arial", 30, FontStyle.Bold),
-                Brushes.Black,
-                rectDerecha,
-                sf);
+            if (izquierda)
+            {
+                var state = g.Save();
+                g.TranslateTransform(drawRect.Right, drawRect.Top);
+                g.ScaleTransform(-1, 1);
+                g.DrawImage(flechaImg, 0, 0, drawRect.Width, drawRect.Height);
+                g.Restore(state);
+            }
+            else
+            {
+                g.DrawImage(flechaImg, drawRect);
+            }
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+
+            Rectangle nuevoHover = Rectangle.Empty;
+
+            if (rectCentro.Contains(e.Location)) nuevoHover = rectCentro;
+            else if (rectIzquierda.Contains(e.Location)) nuevoHover = rectIzquierda;
+            else if (rectDerecha.Contains(e.Location)) nuevoHover = rectDerecha;
+
+            if (hoverRect != nuevoHover)
+            {
+                hoverRect = nuevoHover;
+                this.Invalidate();
+            }
+
+            if (hoverRect == Rectangle.Empty)
+                this.Cursor = Cursors.Default;
         }
 
         protected override void OnMouseClick(MouseEventArgs e)
@@ -180,37 +273,17 @@ namespace BDGameQuiz
             if (categorias.Count == 0) return;
 
             if (rectCentro.Contains(e.Location))
-            {
                 SeleccionarCategoria();
-            }
             else if (rectIzquierda.Contains(e.Location))
             {
-                indiceActual--;
-                if (indiceActual < 0)
-                    indiceActual = categorias.Count - 1;
-
+                indiceActual = (indiceActual - 1 + categorias.Count) % categorias.Count;
                 this.Invalidate();
             }
             else if (rectDerecha.Contains(e.Location))
             {
-                indiceActual++;
-                if (indiceActual >= categorias.Count)
-                    indiceActual = 0;
-
+                indiceActual = (indiceActual + 1) % categorias.Count;
                 this.Invalidate();
             }
-        }
-
-        protected override void OnMouseMove(MouseEventArgs e)
-        {
-            base.OnMouseMove(e);
-
-            if (rectCentro.Contains(e.Location)) hoverRect = rectCentro;
-            else if (rectIzquierda.Contains(e.Location)) hoverRect = rectIzquierda;
-            else if (rectDerecha.Contains(e.Location)) hoverRect = rectDerecha;
-            else hoverRect = Rectangle.Empty;
-
-            this.Invalidate();
         }
 
         void SeleccionarCategoria()
@@ -227,21 +300,13 @@ namespace BDGameQuiz
         {
             if (keyData == Keys.Escape)
             {
-                DialogResult result = MessageBox.Show(
-                    "Quieres Salir del Juego?",
-                    "Exit",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question
-                );
-
-                if (result == DialogResult.Yes)
+                if (MessageBox.Show("Quieres Salir del Juego?", "Exit",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                 {
                     Application.Exit();
                 }
-
                 return true;
             }
-
             return base.ProcessCmdKey(ref msg, keyData);
         }
     }
