@@ -60,6 +60,8 @@ namespace BDGameQuiz
             this.Resize += Juego_Resize;
             this.Disposed += Juego_Disposed;
 
+            // Crear la partida ANTES de cargar preguntas
+            CrearPartida();
             CargarPreguntas();
         }
 
@@ -93,8 +95,8 @@ namespace BDGameQuiz
             if (keyData == Keys.Escape)
             {
                 DialogResult result = MessageBox.Show(
-                    "Quieres Salir del Juego?",
-                    "Exit",
+                    "¿Quieres Salir del Juego?",
+                    "Salir",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Question
                 );
@@ -187,7 +189,7 @@ namespace BDGameQuiz
 
             try
             {
-                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=RootRoot;"))
+                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
                 {
                     conn.Open();
 
@@ -379,12 +381,6 @@ namespace BDGameQuiz
                 LineAlignment = StringAlignment.Center
             };
 
-            StringFormat sfCentroArriba = new StringFormat
-            {
-                Alignment = StringAlignment.Center,
-                LineAlignment = StringAlignment.Near
-            };
-
             // Pregunta
             g.DrawString(
                 p.Enunciado,
@@ -460,7 +456,7 @@ namespace BDGameQuiz
                 string texto = $"🔊 Audio {i + 1}";
                 if (indiceAudioPrevisualizado.HasValue && indiceAudioPrevisualizado.Value == i && !esperandoSiguientePregunta)
                 {
-                    texto += "\n(ya reproducido)";
+                    texto += "\n(Click para responder)";
                 }
 
                 g.DrawString(
@@ -607,8 +603,17 @@ namespace BDGameQuiz
             indiceSeleccionado = opcion;
             esperandoSiguientePregunta = true;
 
-            if (opcion == preguntaActual.Correcta)
+            bool esCorrecto = opcion == preguntaActual.Correcta;
+
+            if (esCorrecto)
+            {
                 score++;
+                // Actualizar el puntaje en la base de datos
+                ActualizarPuntajePartida();
+            }
+
+            // Guardar el detalle de la respuesta
+            GuardarDetallePartida(preguntaActual.IdPregunta, esCorrecto);
 
             Invalidate();
 
@@ -633,30 +638,91 @@ namespace BDGameQuiz
             timer.Start();
         }
 
-        private void GuardarPartida()
+        private void CrearPartida()
         {
             try
             {
-                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=RootRoot;"))
+                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
                 {
                     conn.Open();
 
                     string query = @"INSERT INTO partida (ID_Jugador, ID_Cat, Puntaje, Fecha, Hora) 
-                                     VALUES (@jugador, @cat, @score, CURDATE(), CURTIME())";
+                            VALUES (@jugador, @cat, 0, CURDATE(), CURTIME())";
 
                     MySqlCommand cmd = new MySqlCommand(query, conn);
                     cmd.Parameters.AddWithValue("@jugador", idJugador);
                     cmd.Parameters.AddWithValue("@cat", idCategoria);
-                    cmd.Parameters.AddWithValue("@score", score);
 
                     cmd.ExecuteNonQuery();
                     idPartida = (int)cmd.LastInsertedId;
+
+                    Console.WriteLine($"Partida creada con ID: {idPartida}");
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error al guardar la partida: " + ex.Message);
+                MessageBox.Show("Error al crear la partida: " + ex.Message);
                 idPartida = 0;
+            }
+        }
+
+        private void ActualizarPuntajePartida()
+        {
+            try
+            {
+                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
+                {
+                    conn.Open();
+
+                    string query = "UPDATE partida SET Puntaje = @score WHERE ID_Partida = @id";
+
+                    MySqlCommand cmd = new MySqlCommand(query, conn);
+                    cmd.Parameters.AddWithValue("@score", score);
+                    cmd.Parameters.AddWithValue("@id", idPartida);
+
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error al actualizar puntaje: " + ex.Message);
+            }
+        }
+
+        private void GuardarDetallePartida(int idPregunta, bool esCorrecto)
+        {
+            try
+            {
+                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
+                {
+                    conn.Open();
+
+                    string queryGetNext = @"SELECT IFNULL(MAX(ID_Detalle), 0) + 1 
+                                    FROM detalle_partida 
+                                    WHERE ID_Partida = @partida";
+
+                    MySqlCommand cmdGetNext = new MySqlCommand(queryGetNext, conn);
+                    cmdGetNext.Parameters.AddWithValue("@partida", idPartida);
+
+                    int siguienteDetalle = Convert.ToInt32(cmdGetNext.ExecuteScalar());
+
+                    string query = @"INSERT INTO detalle_partida 
+                            (ID_Partida, ID_Detalle, ID_Cat, ID_Preg, Es_Acierto) 
+                            VALUES (@partida, @detalle, @cat, @preg, @acierto)";
+
+                    MySqlCommand cmd = new MySqlCommand(query, conn);
+                    cmd.Parameters.AddWithValue("@partida", idPartida);
+                    cmd.Parameters.AddWithValue("@detalle", siguienteDetalle);
+                    cmd.Parameters.AddWithValue("@cat", idCategoria);
+                    cmd.Parameters.AddWithValue("@preg", idPregunta);
+                    cmd.Parameters.AddWithValue("@acierto", esCorrecto ? 1 : 0);
+
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error al guardar detalle de la pregunta: " + ex.Message);
             }
         }
 
@@ -665,8 +731,6 @@ namespace BDGameQuiz
             LiberarImagenes();
 
             try { player.controls.stop(); } catch { }
-
-            GuardarPartida();
 
             resultados r = new resultados(score, preguntas.Count, nombreJugador, idPartida);
             r.Show();

@@ -109,7 +109,7 @@
             this.ScoresView.RowTemplate.Height = 24;
             this.ScoresView.Size = new System.Drawing.Size(635, 255);
             this.ScoresView.TabIndex = 1;
-            this.ScoresView.CellContentClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.ScoresView_CellContentClick);
+            this.ScoresView.CellDoubleClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.ScoresView_CellDoubleClick);
             // 
             // resultados
             // 
