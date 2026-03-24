@@ -19,9 +19,11 @@ namespace BDGameQuiz
 
             this.WindowState = FormWindowState.Maximized;
             this.FormBorderStyle = FormBorderStyle.None;
+            this.BackgroundImage = global::BDGameQuiz.Properties.Resources.fondo;
 
             button1.Enabled = false;
         }
+
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
             if (keyData == Keys.Escape)
@@ -60,8 +62,6 @@ namespace BDGameQuiz
             GuardarJugador(nombreJugador);
             int idJugador = ObtenerIdJugador(nombreJugador);
 
-
-
             menu m = new menu(nombreJugador, idJugador);
 
             m.Show();
@@ -72,7 +72,7 @@ namespace BDGameQuiz
         {
             int id = 0;
 
-            using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
+            using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=RootRoot;"))
             {
                 conn.Open();
 
@@ -89,7 +89,7 @@ namespace BDGameQuiz
 
         void GuardarJugador(string nombre)
         {
-            using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
+            using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=RootRoot;"))
             {
                 conn.Open();
 
@@ -110,7 +110,6 @@ namespace BDGameQuiz
                 }
             }
         }
-
 
         private void nameTextBox_TextChanged(object sender, EventArgs e)
         {

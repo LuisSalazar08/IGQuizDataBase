@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -22,6 +23,8 @@ namespace BDGameQuiz
         private int idJugador;
         private int idPartida;
 
+        private Image fondoActual;
+
         private bool audioYaReproducido = false;
         private int? indiceSeleccionado = null;
         private int? indiceAudioPrevisualizado = null;
@@ -34,10 +37,10 @@ namespace BDGameQuiz
         private readonly Rectangle[] rectOpciones = new Rectangle[4];
         private Rectangle hoverRect = Rectangle.Empty;
 
-        private readonly Font fontPregunta = new Font("Times New Roman", 30, FontStyle.Italic);
-        private readonly Font fontOpcion = new Font("Times New Roman", 20, FontStyle.Italic);
-        private readonly Font fontOpcionAudio = new Font("Times New Roman", 18, FontStyle.Italic);
-        private readonly Font fontError = new Font("Arial", 14, FontStyle.Bold);
+        private readonly Font fontPregunta = new Font("Times New Roman", 40, FontStyle.Italic);
+        private readonly Font fontOpcion = new Font("Times New Roman", 16, FontStyle.Italic);
+        private readonly Font fontOpcionAudio = new Font("Times New Roman", 16, FontStyle.Italic);
+        private readonly Font fontError = new Font("Arial", 13, FontStyle.Bold);
 
         private static readonly Random rnd = new Random();
 
@@ -56,13 +59,29 @@ namespace BDGameQuiz
 
             this.Controls.Clear();
 
+            fondoActual = ObtenerFondoPorCategoria();
+
             this.Load += Juego_Load;
             this.Resize += Juego_Resize;
             this.Disposed += Juego_Disposed;
 
-            // Crear la partida ANTES de cargar preguntas
             CrearPartida();
             CargarPreguntas();
+        }
+
+        private Image ObtenerFondoPorCategoria()
+        {
+            switch (idCategoria)
+            {
+                case 1: return Properties.Resources.fondo_historia;
+                case 2: return Properties.Resources.fondo_geografia;
+                case 3: return Properties.Resources.fondo_cultura;
+                case 4: return Properties.Resources.fondo_gastronomia;
+                case 5: return Properties.Resources.fondo_arte;
+                case 6: return Properties.Resources.fondo_deportes;
+                case 7: return Properties.Resources.fondo_naturaleza;
+                default: return Properties.Resources.fondo;
+            }
         }
 
         private void Juego_Load(object sender, EventArgs e)
@@ -95,8 +114,8 @@ namespace BDGameQuiz
             if (keyData == Keys.Escape)
             {
                 DialogResult result = MessageBox.Show(
-                    "¿Quieres Salir del Juego?",
-                    "Salir",
+                    "Quieres Salir del Juego?",
+                    "Exit",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Question
                 );
@@ -107,6 +126,7 @@ namespace BDGameQuiz
                 }
                 return true;
             }
+
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
@@ -115,22 +135,24 @@ namespace BDGameQuiz
             int w = this.ClientSize.Width;
             int h = this.ClientSize.Height;
 
-            int margen = 12;
-            int altoPregunta = 130;
-            int separacion = 10;
+            int margen = 30;
+            int separacion = 25;
+            int offsetY = (int)(h * 0.08);
+            int altoPregunta = 140;
 
             rectPregunta = new Rectangle(
                 margen,
-                margen + 10,
+                margen + offsetY,
                 w - (margen * 2),
                 altoPregunta
             );
 
-            int areaOpcionesY = rectPregunta.Bottom + 25;
+            int espacioPreguntaOpciones = 50;
+            int areaOpcionesY = rectPregunta.Bottom + espacioPreguntaOpciones;
             int areaOpcionesAlto = h - areaOpcionesY - margen;
 
             int anchoOpcion = (w - (margen * 2) - separacion) / 2;
-            int altoOpcion = (areaOpcionesAlto - separacion) / 2;
+            int altoOpcion = Math.Min(180, (areaOpcionesAlto - separacion) / 2);
 
             rectOpciones[0] = new Rectangle(margen, areaOpcionesY, anchoOpcion, altoOpcion);
             rectOpciones[1] = new Rectangle(margen + anchoOpcion + separacion, areaOpcionesY, anchoOpcion, altoOpcion);
@@ -189,7 +211,7 @@ namespace BDGameQuiz
 
             try
             {
-                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
+                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=RootRoot;"))
                 {
                     conn.Open();
 
@@ -201,18 +223,25 @@ namespace BDGameQuiz
                     {
                         while (dr.Read())
                         {
-                            Pregunta p = new Pregunta();
-                            p.IdPregunta = Convert.ToInt32(dr["ID_Preg"]);
-                            p.Enunciado = dr["Enunciado"].ToString();
-                            p.Opciones = new string[4];
-                            p.Correcta = -1;
+                            Pregunta p = new Pregunta
+                            {
+                                IdPregunta = Convert.ToInt32(dr["ID_Preg"]),
+                                Enunciado = dr["Enunciado"].ToString(),
+                                Opciones = new string[4],
+                                Correcta = -1,
+                                Tipo = "texto"
+                            };
+
                             preguntas.Add(p);
                         }
                     }
 
                     foreach (Pregunta p in preguntas)
                     {
-                        string queryIncisos = @"SELECT * FROM inciso WHERE ID_Cat = @cat AND ID_Preg = @preg ORDER BY ID_Inc";
+                        string queryIncisos = @"SELECT * 
+                                                FROM inciso 
+                                                WHERE ID_Cat = @cat AND ID_Preg = @preg 
+                                                ORDER BY ID_Inc";
 
                         MySqlCommand cmdInc = new MySqlCommand(queryIncisos, conn);
                         cmdInc.Parameters.AddWithValue("@preg", p.IdPregunta);
@@ -248,7 +277,6 @@ namespace BDGameQuiz
                         if (p.Correcta == -1)
                         {
                             p.Correcta = 0;
-                            Console.WriteLine($"ADVERTENCIA: Pregunta {p.IdPregunta} sin respuesta correcta");
                         }
 
                         MezclarOpciones(p);
@@ -278,14 +306,12 @@ namespace BDGameQuiz
             {
                 if (string.IsNullOrEmpty(ruta) || !File.Exists(ruta))
                 {
-                    Console.WriteLine($"Archivo no encontrado: {ruta}");
                     return null;
                 }
 
                 string extension = Path.GetExtension(ruta).ToLower();
                 if (extension != ".jpg" && extension != ".jpeg" && extension != ".png" && extension != ".bmp" && extension != ".gif")
                 {
-                    Console.WriteLine($"Formato no soportado: {extension}");
                     return null;
                 }
 
@@ -297,10 +323,8 @@ namespace BDGameQuiz
                     return copia;
                 }
             }
-            catch (OutOfMemoryException ex)
+            catch
             {
-                Console.WriteLine($"Error de memoria al cargar imagen {ruta}: {ex.Message}");
-
                 try
                 {
                     Image img = Image.FromFile(ruta);
@@ -311,11 +335,6 @@ namespace BDGameQuiz
                 {
                     return null;
                 }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error al cargar imagen {ruta}: {ex.Message}");
-                return null;
             }
         }
 
@@ -362,7 +381,21 @@ namespace BDGameQuiz
             base.OnPaint(e);
 
             Graphics g = e.Graphics;
-            g.Clear(Color.FromArgb(194, 255, 194));
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            if (fondoActual != null)
+            {
+                g.DrawImage(fondoActual, new Rectangle(0, 0, this.ClientSize.Width, this.ClientSize.Height));
+            }
+            else
+            {
+                g.Clear(Color.FromArgb(194, 255, 194));
+            }
+
+            using (Brush overlay = new SolidBrush(Color.FromArgb(80, 0, 0, 0)))
+            {
+                g.FillRectangle(overlay, this.ClientRectangle);
+            }
 
             if (preguntas == null || preguntas.Count == 0 || indicePregunta >= preguntas.Count)
                 return;
@@ -375,13 +408,16 @@ namespace BDGameQuiz
                 LineAlignment = StringAlignment.Center
             };
 
-            StringFormat sfIzq = new StringFormat
+            using (Brush bgPregunta = new SolidBrush(Color.FromArgb(185, 255, 255, 255)))
             {
-                Alignment = StringAlignment.Near,
-                LineAlignment = StringAlignment.Center
-            };
+                g.FillRectangle(bgPregunta, rectPregunta);
+            }
 
-            // Pregunta
+            using (Pen penPregunta = new Pen(Color.FromArgb(140, 0, 0, 0), 2))
+            {
+                g.DrawRectangle(penPregunta, rectPregunta);
+            }
+
             g.DrawString(
                 p.Enunciado,
                 fontPregunta,
@@ -390,21 +426,20 @@ namespace BDGameQuiz
                 sfCentro
             );
 
-            // Opciones
             for (int i = 0; i < 4; i++)
             {
-                DibujarOpcion(g, p, i, sfCentro, sfIzq);
+                DibujarOpcion(g, p, i, sfCentro);
             }
         }
 
-        private void DibujarOpcion(Graphics g, Pregunta p, int i, StringFormat sfCentro, StringFormat sfIzq)
+        private void DibujarOpcion(Graphics g, Pregunta p, int i, StringFormat sfCentro)
         {
             Rectangle rect = rectOpciones[i];
 
-            Color fondo = Color.WhiteSmoke;
+            Color fondo = Color.FromArgb(205, Color.White);
 
             if (hoverRect == rect)
-                fondo = Color.Gainsboro;
+                fondo = Color.FromArgb(225, Color.LightGray);
 
             if (indiceSeleccionado.HasValue)
             {
@@ -421,7 +456,7 @@ namespace BDGameQuiz
 
             g.DrawRectangle(Pens.Black, rect);
 
-            Rectangle inner = new Rectangle(rect.X + 10, rect.Y + 10, rect.Width - 20, rect.Height - 20);
+            Rectangle inner = new Rectangle(rect.X + 8, rect.Y + 8, rect.Width - 16, rect.Height - 16);
 
             if (p.Tipo == "texto")
             {
@@ -454,9 +489,11 @@ namespace BDGameQuiz
             else if (p.Tipo == "audio")
             {
                 string texto = $"🔊 Audio {i + 1}";
-                if (indiceAudioPrevisualizado.HasValue && indiceAudioPrevisualizado.Value == i && !esperandoSiguientePregunta)
+                if (indiceAudioPrevisualizado.HasValue &&
+                    indiceAudioPrevisualizado.Value == i &&
+                    !esperandoSiguientePregunta)
                 {
-                    texto += "\n(Click para responder)";
+                    texto += "\n(ya reproducido)";
                 }
 
                 g.DrawString(
@@ -528,6 +565,11 @@ namespace BDGameQuiz
                 hoverRect = nuevoHover;
                 Invalidate();
             }
+
+            if (hoverRect == Rectangle.Empty)
+                this.Cursor = Cursors.Default;
+            else
+                this.Cursor = Cursors.Hand;
         }
 
         protected override void OnMouseClick(MouseEventArgs e)
@@ -540,15 +582,13 @@ namespace BDGameQuiz
             if (indicePregunta >= preguntas.Count)
                 return;
 
-            var p = preguntas[indicePregunta];
-
             for (int i = 0; i < rectOpciones.Length; i++)
             {
-                if (!rectOpciones[i].Contains(e.Location))
-                    continue;
-
-                ManejarClick(i);
-                break;
+                if (rectOpciones[i].Contains(e.Location))
+                {
+                    ManejarClick(i);
+                    break;
+                }
             }
         }
 
@@ -608,11 +648,9 @@ namespace BDGameQuiz
             if (esCorrecto)
             {
                 score++;
-                // Actualizar el puntaje en la base de datos
                 ActualizarPuntajePartida();
             }
 
-            // Guardar el detalle de la respuesta
             GuardarDetallePartida(preguntaActual.IdPregunta, esCorrecto);
 
             Invalidate();
@@ -642,12 +680,12 @@ namespace BDGameQuiz
         {
             try
             {
-                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
+                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=RootRoot;"))
                 {
                     conn.Open();
 
                     string query = @"INSERT INTO partida (ID_Jugador, ID_Cat, Puntaje, Fecha, Hora) 
-                            VALUES (@jugador, @cat, 0, CURDATE(), CURTIME())";
+                                     VALUES (@jugador, @cat, 0, CURDATE(), CURTIME())";
 
                     MySqlCommand cmd = new MySqlCommand(query, conn);
                     cmd.Parameters.AddWithValue("@jugador", idJugador);
@@ -655,8 +693,6 @@ namespace BDGameQuiz
 
                     cmd.ExecuteNonQuery();
                     idPartida = (int)cmd.LastInsertedId;
-
-                    Console.WriteLine($"Partida creada con ID: {idPartida}");
                 }
             }
             catch (Exception ex)
@@ -670,7 +706,7 @@ namespace BDGameQuiz
         {
             try
             {
-                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
+                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=RootRoot;"))
                 {
                     conn.Open();
 
@@ -693,22 +729,22 @@ namespace BDGameQuiz
         {
             try
             {
-                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
+                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=RootRoot;"))
                 {
                     conn.Open();
 
-                    string queryGetNext = @"SELECT IFNULL(MAX(ID_Detalle), 0) + 1 
-                                    FROM detalle_partida 
-                                    WHERE ID_Partida = @partida";
+                    string queryGetNext = @"SELECT IFNULL(MAX(ID_Detalle), 0) + 1
+                                            FROM detalle_partida
+                                            WHERE ID_Partida = @partida";
 
                     MySqlCommand cmdGetNext = new MySqlCommand(queryGetNext, conn);
                     cmdGetNext.Parameters.AddWithValue("@partida", idPartida);
 
                     int siguienteDetalle = Convert.ToInt32(cmdGetNext.ExecuteScalar());
 
-                    string query = @"INSERT INTO detalle_partida 
-                            (ID_Partida, ID_Detalle, ID_Cat, ID_Preg, Es_Acierto) 
-                            VALUES (@partida, @detalle, @cat, @preg, @acierto)";
+                    string query = @"INSERT INTO detalle_partida
+                                     (ID_Partida, ID_Detalle, ID_Cat, ID_Preg, Es_Acierto)
+                                     VALUES (@partida, @detalle, @cat, @preg, @acierto)";
 
                     MySqlCommand cmd = new MySqlCommand(query, conn);
                     cmd.Parameters.AddWithValue("@partida", idPartida);
@@ -732,6 +768,8 @@ namespace BDGameQuiz
 
             try { player.controls.stop(); } catch { }
 
+            ActualizarPuntajePartida();
+
             resultados r = new resultados(score, preguntas.Count, nombreJugador, idPartida);
             r.Show();
 
@@ -746,6 +784,7 @@ namespace BDGameQuiz
 
             menu m = new menu(nombreJugador, idJugador);
             m.Show();
+
             this.Close();
         }
     }
