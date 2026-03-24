@@ -72,7 +72,7 @@ namespace BDGameQuiz
         {
             int id = 0;
 
-            using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=RootRoot;"))
+            using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
             {
                 conn.Open();
 
@@ -89,7 +89,7 @@ namespace BDGameQuiz
 
         void GuardarJugador(string nombre)
         {
-            using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=RootRoot;"))
+            using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
             {
                 conn.Open();
 

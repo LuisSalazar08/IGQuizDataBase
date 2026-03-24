@@ -37,12 +37,9 @@ namespace BDGameQuiz
 
             ScoresView.Visible = true;
 
-            // Evento doble click
-            ScoresView.CellDoubleClick += ScoresView_CellDoubleClick;
 
             CargarHistorial();
 
-            // Seleccionar la partida reciente automáticamente
             if (ScoresView.Rows.Count > 0 && idPartidaReciente > 0)
             {
                 foreach (DataGridViewRow row in ScoresView.Rows)

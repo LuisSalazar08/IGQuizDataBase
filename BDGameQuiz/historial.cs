@@ -39,12 +39,13 @@ namespace BDGameQuiz
                 {
                     conn.Open();
 
-                    string query = @"
-                    SELECT pr.Enunciado, dp.Es_Acierto
-                    FROM detalle_partida dp
-                    JOIN pregunta pr ON dp.ID_Preg = pr.ID_Preg
-                    WHERE dp.ID_Partida = @id
-                    ORDER BY dp.ID_Detalle ASC";
+                    string query = @"SELECT pr.Enunciado, dp.Es_Acierto
+                        FROM detalle_partida dp
+                        JOIN pregunta pr 
+                        ON dp.ID_Preg = pr.ID_Preg 
+                        AND dp.ID_Cat = pr.ID_Cat
+                        WHERE dp.ID_Partida = @id
+                        ORDER BY dp.ID_Detalle ASC";
 
                     MySqlCommand cmd = new MySqlCommand(query, conn);
                     cmd.Parameters.AddWithValue("@id", idPartida);
@@ -60,7 +61,7 @@ namespace BDGameQuiz
                     dr.Close();
                 }
 
-                this.Invalidate(); // redibujar
+                this.Invalidate();
             }
             catch (Exception ex)
             {
@@ -77,7 +78,6 @@ namespace BDGameQuiz
             int x = 50;
             int y = 80 - scrollY;
 
-            // Título
             g.DrawString($"Detalle de la Partida #{idPartida}",
                 new Font("Segoe UI", 18, FontStyle.Bold),
                 Brushes.DarkBlue, 50, 20);
@@ -101,7 +101,6 @@ namespace BDGameQuiz
                 y += espacio;
             }
 
-            // Texto de ayuda
             if (preguntas.Count > 10)
             {
                 g.DrawString("Usa la rueda del mouse para desplazarte",
