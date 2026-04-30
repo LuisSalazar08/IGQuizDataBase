@@ -2,12 +2,17 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
-using MySql.Data.MySqlClient;
+using System.Net.Http;
+using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace BDGameQuiz
 {
     public partial class resultados : Form
     {
+        private static readonly HttpClient httpClient = new HttpClient();
+        private const string API_BASE_URL = "http://192.168.56.1:8080";
+
         int score;
         int total;
         int idPartidaReciente;
@@ -38,7 +43,27 @@ namespace BDGameQuiz
             ScoresView.Visible = true;
 
 
-            CargarHistorial();
+            this.Load += async (s, e) =>
+            {
+                CargarHistorial();
+
+                if (idPartidaReciente > 0)
+                {
+                    await Task.Delay(200);
+
+                    foreach (DataGridViewRow row in ScoresView.Rows)
+                    {
+                        if (row.Cells[0].Value != null &&
+                            Convert.ToInt32(row.Cells[0].Value) == idPartidaReciente)
+                        {
+                            row.Selected = true;
+                            partidaSeleccionada = idPartidaReciente;
+                            CargarDetalle(idPartidaReciente);
+                            break;
+                        }
+                    }
+                }
+            };
 
             if (ScoresView.Rows.Count > 0 && idPartidaReciente > 0)
             {
@@ -55,53 +80,47 @@ namespace BDGameQuiz
             }
         }
 
-        void CargarHistorial()
+        async void CargarHistorial()
         {
             try
             {
-                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
+                string url = $"{API_BASE_URL}/games/?limit=20";
+
+                HttpResponseMessage response = await httpClient.GetAsync(url);
+
+                if (!response.IsSuccessStatusCode)
                 {
-                    conn.Open();
-
-                    string query = @"
-                    SELECT p.ID_Partida, 
-                           j.Nombre AS Jugador,
-                           c.Nombre AS Categoria,
-                           CONCAT(p.Puntaje, '/14') AS Puntaje
-                    FROM partida p
-                    JOIN jugador j ON p.ID_Jugador = j.ID_Jugador
-                    JOIN categoria c ON p.ID_Cat = c.ID_Cat
-                    ORDER BY p.ID_Partida DESC
-                    LIMIT 20";
-
-                    MySqlDataAdapter adapter = new MySqlDataAdapter(query, conn);
-                    System.Data.DataTable dt = new System.Data.DataTable();
-                    adapter.Fill(dt);
-
-                    ScoresView.Columns.Clear();
-
-                    // Columnas
-                    ScoresView.Columns.Add("ID_Partida", "ID");
-                    ScoresView.Columns.Add("Jugador", "Jugador");
-                    ScoresView.Columns.Add("Categoria", "Categoría");
-                    ScoresView.Columns.Add("Puntaje", "Puntaje");
-
-                    // Llenar
-                    foreach (System.Data.DataRow row in dt.Rows)
-                    {
-                        ScoresView.Rows.Add(
-                            row["ID_Partida"],
-                            row["Jugador"],
-                            row["Categoria"],
-                            row["Puntaje"]
-                        );
-                    }
-
-                    ScoresView.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-                    ScoresView.ReadOnly = true;
-                    ScoresView.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-                    ScoresView.AllowUserToAddRows = false;
+                    MessageBox.Show("Error al obtener historial");
+                    return;
                 }
+
+                string json = await response.Content.ReadAsStringAsync();
+
+                var historial = JsonSerializer.Deserialize<List<HistorialAPI>>(json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                ScoresView.Columns.Clear();
+                ScoresView.Rows.Clear();
+
+                ScoresView.Columns.Add("ID_Partida", "ID");
+                ScoresView.Columns.Add("Jugador", "Jugador");
+                ScoresView.Columns.Add("Categoria", "Categoría");
+                ScoresView.Columns.Add("Puntaje", "Puntaje");
+
+                foreach (var item in historial)
+                {
+                    ScoresView.Rows.Add(
+                        item.ID_Partida,
+                        item.Nombre,
+                        item.Categoria,
+                        item.Puntaje
+                    );
+                }
+
+                ScoresView.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                ScoresView.ReadOnly = true;
+                ScoresView.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+                ScoresView.AllowUserToAddRows = false;
             }
             catch (Exception ex)
             {
@@ -109,37 +128,32 @@ namespace BDGameQuiz
             }
         }
 
-        void CargarDetalle(int idPartida)
+        async void CargarDetalle(int idPartida)
         {
             preguntas.Clear();
             resultadosLista.Clear();
 
             try
             {
-                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
+                string url = $"{API_BASE_URL}/games/{idPartida}/details";
+
+                HttpResponseMessage response = await httpClient.GetAsync(url);
+
+                if (!response.IsSuccessStatusCode)
                 {
-                    conn.Open();
+                    MessageBox.Show("Error al obtener detalle");
+                    return;
+                }
 
-                    string query = @"
-                        SELECT pr.Enunciado, dp.Es_Acierto
-                        FROM detalle_partida dp
-                        JOIN pregunta pr 
-                        ON dp.ID_Preg = pr.ID_Preg AND dp.ID_Cat = pr.ID_Cat
-                        WHERE dp.ID_Partida = @id
-                        ORDER BY dp.ID_Detalle ASC";
+                string json = await response.Content.ReadAsStringAsync();
 
-                    MySqlCommand cmd = new MySqlCommand(query, conn);
-                    cmd.Parameters.AddWithValue("@id", idPartida);
+                var detalles = JsonSerializer.Deserialize<List<DetalleAPI>>(json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-                    MySqlDataReader dr = cmd.ExecuteReader();
-
-                    while (dr.Read())
-                    {
-                        preguntas.Add(dr["Enunciado"].ToString());
-                        resultadosLista.Add(Convert.ToBoolean(dr["Es_Acierto"]));
-                    }
-
-                    dr.Close();
+                foreach (var d in detalles)
+                {
+                    preguntas.Add(d.Enunciado);
+                    resultadosLista.Add(d.Es_Acierto);
                 }
 
                 scrollY = 0;
@@ -260,6 +274,20 @@ namespace BDGameQuiz
         {
             base.OnResize(e);
             this.Invalidate();
+        }
+
+        public class HistorialAPI
+        {
+            public int ID_Partida { get; set; }
+            public string Nombre { get; set; }
+            public string Categoria { get; set; }
+            public int Puntaje { get; set; }
+        }
+
+        public class DetalleAPI
+        {
+            public string Enunciado { get; set; }
+            public bool Es_Acierto { get; set; }
         }
     }
 }

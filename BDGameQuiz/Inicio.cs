@@ -1,5 +1,4 @@
-﻿using MySql.Data.MySqlClient;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -8,7 +7,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-
+using System.Net.Http;
+using System.Text;
+using Newtonsoft.Json;
 namespace BDGameQuiz
 {
     public partial class Inicio : Form
@@ -24,6 +25,11 @@ namespace BDGameQuiz
             button1.Enabled = false;
         }
 
+        class Jugador
+        {
+            public int id { get; set; }
+            public string nombre { get; set; }
+        }
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
             if (keyData == Keys.Escape)
@@ -56,58 +62,32 @@ namespace BDGameQuiz
 
         }
 
-        private void button1_Click(object sender, EventArgs e)
+        private async void button1_Click(object sender, EventArgs e)
         {
             string nombreJugador = nameTextBox.Text;
-            GuardarJugador(nombreJugador);
-            int idJugador = ObtenerIdJugador(nombreJugador);
 
-            menu m = new menu(nombreJugador, idJugador);
+            var jugador = await CrearOObtenerJugador(nombreJugador);
+
+            menu m = new menu(jugador.nombre, jugador.id);
 
             m.Show();
             this.Hide();
         }
 
-        int ObtenerIdJugador(string nombre)
+        async Task<Jugador> CrearOObtenerJugador(string nombre)
         {
-            int id = 0;
-
-            using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
+            using (HttpClient client = new HttpClient())
             {
-                conn.Open();
+                var jugador = new { nombre = nombre };
+                string json = JsonConvert.SerializeObject(jugador);
 
-                string query = "SELECT ID_Jugador FROM jugador WHERE Nombre=@nombre";
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                MySqlCommand cmd = new MySqlCommand(query, conn);
-                cmd.Parameters.AddWithValue("@nombre", nombre);
+                var response = await client.PostAsync("http://10.103.151.175:8080/players", content);
 
-                id = Convert.ToInt32(cmd.ExecuteScalar());
-            }
+                var responseJson = await response.Content.ReadAsStringAsync();
 
-            return id;
-        }
-
-        void GuardarJugador(string nombre)
-        {
-            using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
-            {
-                conn.Open();
-
-                string check = "SELECT COUNT(*) FROM jugador WHERE Nombre = @nombre";
-
-                MySqlCommand cmd = new MySqlCommand(check, conn);
-                cmd.Parameters.AddWithValue("@nombre", nombre);
-
-                int existe = Convert.ToInt32(cmd.ExecuteScalar());
-
-                if (existe == 0)
-                {
-                    string insert = "INSERT INTO jugador (Nombre) VALUES (@nombre)";
-
-                    MySqlCommand cmdInsert = new MySqlCommand(insert, conn);
-                    cmdInsert.Parameters.AddWithValue("@nombre", nombre);
-                    cmdInsert.ExecuteNonQuery();
-                }
+                return JsonConvert.DeserializeObject<Jugador>(responseJson);
             }
         }
 

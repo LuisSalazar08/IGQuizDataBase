@@ -1,13 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Net.Http;
+using System.Text.Json;
+using System.Threading.Tasks;
 using System.Windows.Forms;
-using MySql.Data.MySqlClient;
+using static BDGameQuiz.resultados;
 
 namespace BDGameQuiz
 {
     public partial class historial : Form
     {
+        private static readonly HttpClient httpClient = new HttpClient();
+        private const string API_BASE_URL = "http://192.168.56.1:8080";
+
         int idPartida;
 
         List<string> preguntas = new List<string>();
@@ -25,42 +31,41 @@ namespace BDGameQuiz
             this.WindowState = FormWindowState.Maximized;
             this.DoubleBuffered = true;
 
-            CargarDetalle();
+            this.Load += (s, e) =>
+            {
+                CargarDetalle();
+            };
         }
 
-        void CargarDetalle()
+        async void CargarDetalle()
         {
             preguntas.Clear();
             resultados.Clear();
 
             try
             {
-                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
+                string url = $"{API_BASE_URL}/games/{idPartida}/details";
+
+                HttpResponseMessage response = await httpClient.GetAsync(url);
+
+                if (!response.IsSuccessStatusCode)
                 {
-                    conn.Open();
-
-                    string query = @"SELECT pr.Enunciado, dp.Es_Acierto
-                        FROM detalle_partida dp
-                        JOIN pregunta pr 
-                        ON dp.ID_Preg = pr.ID_Preg 
-                        AND dp.ID_Cat = pr.ID_Cat
-                        WHERE dp.ID_Partida = @id
-                        ORDER BY dp.ID_Detalle ASC";
-
-                    MySqlCommand cmd = new MySqlCommand(query, conn);
-                    cmd.Parameters.AddWithValue("@id", idPartida);
-
-                    MySqlDataReader dr = cmd.ExecuteReader();
-
-                    while (dr.Read())
-                    {
-                        preguntas.Add(dr["Enunciado"].ToString());
-                        resultados.Add(Convert.ToBoolean(dr["Es_Acierto"]));
-                    }
-
-                    dr.Close();
+                    MessageBox.Show("Error al obtener detalle");
+                    return;
                 }
 
+                string json = await response.Content.ReadAsStringAsync();
+
+                var detalles = JsonSerializer.Deserialize<List<DetalleAPI>>(json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                foreach (var d in detalles)
+                {
+                    preguntas.Add(d.Enunciado);
+                    resultados.Add(d.Es_Acierto);
+                }
+
+                scrollY = 0;
                 this.Invalidate();
             }
             catch (Exception ex)
@@ -126,6 +131,12 @@ namespace BDGameQuiz
         private void btnCerrar_Click(object sender, EventArgs e)
         {
             this.Close();
+        }
+
+        public class DetalleAPI
+        {
+            public string Enunciado { get; set; }
+            public bool Es_Acierto { get; set; }
         }
     }
 }

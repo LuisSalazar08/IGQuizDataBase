@@ -1,9 +1,11 @@
-﻿using MySql.Data.MySqlClient;
+﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
+using System.Net.Http;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace BDGameQuiz
@@ -15,8 +17,8 @@ namespace BDGameQuiz
 
         class Categoria
         {
-            public int Id;
-            public string Nombre;
+            public int ID_Cat { get; set; }
+            public string Nombre { get; set; }
         }
 
         List<Categoria> categorias = new List<Categoria>();
@@ -74,7 +76,11 @@ namespace BDGameQuiz
                 this.Invalidate();
             };
 
-            CargarCategorias();
+            this.Load += async (s, e) =>
+            {
+                CalcularRectangulos();
+                await CargarCategoriasAPI();
+            };
         }
 
         Image CrearFondoConOpacidad(Image original, float opacidad)
@@ -99,37 +105,31 @@ namespace BDGameQuiz
             return bmp;
         }
 
-        void CargarCategorias()
+        async Task CargarCategoriasAPI()
         {
-            categorias.Clear();
-
-            using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
+            using (HttpClient client = new HttpClient())
             {
-                conn.Open();
+                var response = await client.GetAsync("http://192.168.56.1:8080/categories/");
 
-                string query = "SELECT * FROM categoria LIMIT 7";
-                MySqlCommand cmd = new MySqlCommand(query, conn);
+                var json = await response.Content.ReadAsStringAsync();
 
-                using (MySqlDataReader dr = cmd.ExecuteReader())
+                if (!response.IsSuccessStatusCode)
                 {
-                    while (dr.Read())
-                    {
-                        categorias.Add(new Categoria
-                        {
-                            Id = Convert.ToInt32(dr["ID_Cat"]),
-                            Nombre = dr["Nombre"].ToString()
-                        });
-                    }
+                    MessageBox.Show("Error al obtener categorías");
+                    return;
                 }
-            }
 
-            if (categorias.Count == 0)
-            {
-                MessageBox.Show("No hay categorías disponibles");
-                return;
-            }
+                categorias = JsonConvert.DeserializeObject<List<Categoria>>(json);
 
-            indiceActual = 0;
+                if (categorias.Count == 0)
+                {
+                    MessageBox.Show("No hay categorías disponibles");
+                    return;
+                }
+
+                indiceActual = 0;
+                this.Invalidate();
+            }
         }
 
         void CalcularRectangulos()
@@ -273,14 +273,14 @@ namespace BDGameQuiz
             }
             else if (rectDerecha.Contains(e.Location))
             {
-                indiceActual = (indiceActual + 1) % categorias.Count; // 🔥 FIX AQUÍ
+                indiceActual = (indiceActual + 1) % categorias.Count;
                 this.Invalidate();
             }
         }
 
         void SeleccionarCategoria()
         {
-            int idCategoria = categorias[indiceActual].Id;
+            int idCategoria = categorias[indiceActual].ID_Cat;
 
             juego j = new juego(idCategoria, idJugador, nombreJugador);
             j.Show();

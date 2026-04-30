@@ -1,10 +1,13 @@
-﻿using MySql.Data.MySqlClient;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using WMPLib;
 
@@ -12,7 +15,7 @@ namespace BDGameQuiz
 {
     public partial class juego : Form
     {
-        private List<Pregunta> preguntas = new List<Pregunta>();
+        private List<PreguntaAPI> preguntas = new List<PreguntaAPI>();
         private WindowsMediaPlayer player = new WindowsMediaPlayer();
 
         private int indicePregunta = 0;
@@ -43,6 +46,8 @@ namespace BDGameQuiz
         private readonly Font fontError = new Font("Arial", 13, FontStyle.Bold);
 
         private static readonly Random rnd = new Random();
+        private static readonly HttpClient httpClient = new HttpClient();
+        private const string API_BASE_URL = "http://192.168.56.1:8080";
 
         public juego(int cat, int idJugador, string nombreJugador)
         {
@@ -65,8 +70,8 @@ namespace BDGameQuiz
             this.Resize += Juego_Resize;
             this.Disposed += Juego_Disposed;
 
-            CrearPartida();
-            CargarPreguntas();
+            Task.Run(async () => await CrearPartidaAsync()).Wait();
+            Task.Run(async () => await CargarPreguntasAsync()).Wait();
         }
 
         private Image ObtenerFondoPorCategoria()
@@ -147,7 +152,7 @@ namespace BDGameQuiz
                 altoPregunta
             );
 
-            int espacioPreguntaOpciones = 50;
+            int espacioPreguntaOpciones = 200;
             int areaOpcionesY = rectPregunta.Bottom + espacioPreguntaOpciones;
             int areaOpcionesAlto = h - areaOpcionesY - margen;
 
@@ -189,7 +194,7 @@ namespace BDGameQuiz
             hoverRect = Rectangle.Empty;
         }
 
-        private void MezclarOpciones(Pregunta p)
+        private void MezclarOpciones(PreguntaAPI p)
         {
             var opciones = p.Opciones
                 .Select((texto, index) => new { Texto = texto, EsCorrecta = index == p.Correcta })
@@ -205,81 +210,31 @@ namespace BDGameQuiz
             }
         }
 
-        private void CargarPreguntas()
+        private async Task CargarPreguntasAsync()
         {
             preguntas.Clear();
 
             try
             {
-                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
+                string url = $"{API_BASE_URL}/questions/?cat={idCategoria}";
+                HttpResponseMessage response = await httpClient.GetAsync(url);
+
+                if (response.IsSuccessStatusCode)
                 {
-                    conn.Open();
-
-                    string query = "SELECT * FROM pregunta WHERE ID_Cat = @cat ORDER BY RAND() LIMIT 14";
-                    MySqlCommand cmd = new MySqlCommand(query, conn);
-                    cmd.Parameters.AddWithValue("@cat", idCategoria);
-
-                    using (MySqlDataReader dr = cmd.ExecuteReader())
+                    string json = await response.Content.ReadAsStringAsync();
+                    var preguntasTemp = JsonSerializer.Deserialize<List<PreguntaAPI>>(json, new JsonSerializerOptions
                     {
-                        while (dr.Read())
-                        {
-                            Pregunta p = new Pregunta
-                            {
-                                IdPregunta = Convert.ToInt32(dr["ID_Preg"]),
-                                Enunciado = dr["Enunciado"].ToString(),
-                                Opciones = new string[4],
-                                Correcta = -1,
-                                Tipo = "texto"
-                            };
+                        PropertyNameCaseInsensitive = true
+                    });
 
+                    if (preguntasTemp != null)
+                    {
+                        foreach (var p in preguntasTemp)
+                        {
+                            p.Tipo = DetectarTipoPregunta(p);
+                            MezclarOpciones(p);
                             preguntas.Add(p);
                         }
-                    }
-
-                    foreach (Pregunta p in preguntas)
-                    {
-                        string queryIncisos = @"SELECT * 
-                                                FROM inciso 
-                                                WHERE ID_Cat = @cat AND ID_Preg = @preg 
-                                                ORDER BY ID_Inc";
-
-                        MySqlCommand cmdInc = new MySqlCommand(queryIncisos, conn);
-                        cmdInc.Parameters.AddWithValue("@preg", p.IdPregunta);
-                        cmdInc.Parameters.AddWithValue("@cat", idCategoria);
-
-                        using (MySqlDataReader drInc = cmdInc.ExecuteReader())
-                        {
-                            int indiceOpcion = 0;
-                            string tipoDetectado = "texto";
-
-                            while (drInc.Read() && indiceOpcion < 4)
-                            {
-                                p.Opciones[indiceOpcion] = drInc["Contenido"].ToString();
-
-                                if (Convert.ToBoolean(drInc["Respuesta"]))
-                                    p.Correcta = indiceOpcion;
-
-                                if (indiceOpcion == 0)
-                                    tipoDetectado = drInc["Tipo_Inciso"].ToString();
-
-                                indiceOpcion++;
-                            }
-
-                            p.Tipo = tipoDetectado;
-                        }
-
-                        for (int i = 0; i < 4; i++)
-                        {
-                            if (string.IsNullOrEmpty(p.Opciones[i]))
-                                p.Opciones[i] = "Opción no disponible";
-                        }
-
-                        if (p.Correcta == -1)
-                        {
-                            p.Correcta = 0;
-                        }
-
-                        MezclarOpciones(p);
                     }
                 }
 
@@ -297,7 +252,22 @@ namespace BDGameQuiz
             catch (Exception ex)
             {
                 MessageBox.Show("Error al cargar preguntas: " + ex.Message);
+                VolverAlMenu();
             }
+        }
+
+        private string DetectarTipoPregunta(PreguntaAPI p)
+        {
+            foreach (var opcion in p.Opciones)
+            {
+                if (opcion.EndsWith(".mp3") || opcion.EndsWith(".wav") || opcion.EndsWith(".ogg"))
+                    return "audio";
+
+                if (opcion.EndsWith(".jpg") || opcion.EndsWith(".png") || opcion.EndsWith(".bmp") ||
+                    opcion.EndsWith(".jpeg") || opcion.EndsWith(".gif"))
+                    return "imagen";
+            }
+            return "texto";
         }
 
         private Image CargarImagen(string ruta)
@@ -338,7 +308,7 @@ namespace BDGameQuiz
             }
         }
 
-        private void PrepararImagenesDePregunta(Pregunta p)
+        private void PrepararImagenesDePregunta(PreguntaAPI p)
         {
             for (int i = 0; i < imagenesOpcionesActuales.Length; i++)
             {
@@ -419,7 +389,7 @@ namespace BDGameQuiz
             }
 
             g.DrawString(
-                p.Enunciado,
+                p.Pregunta,
                 fontPregunta,
                 Brushes.Black,
                 rectPregunta,
@@ -432,7 +402,7 @@ namespace BDGameQuiz
             }
         }
 
-        private void DibujarOpcion(Graphics g, Pregunta p, int i, StringFormat sfCentro)
+        private void DibujarOpcion(Graphics g, PreguntaAPI p, int i, StringFormat sfCentro)
         {
             Rectangle rect = rectOpciones[i];
 
@@ -572,7 +542,7 @@ namespace BDGameQuiz
                 this.Cursor = Cursors.Hand;
         }
 
-        protected override void OnMouseClick(MouseEventArgs e)
+        protected override async void OnMouseClick(MouseEventArgs e)
         {
             base.OnMouseClick(e);
 
@@ -586,13 +556,13 @@ namespace BDGameQuiz
             {
                 if (rectOpciones[i].Contains(e.Location))
                 {
-                    ManejarClick(i);
+                    await ManejarClickAsync(i);
                     break;
                 }
             }
         }
 
-        private void ManejarClick(int opcion)
+        private async Task ManejarClickAsync(int opcion)
         {
             var p = preguntas[indicePregunta];
 
@@ -611,7 +581,7 @@ namespace BDGameQuiz
                             player.controls.play();
 
                             indiceAudioPrevisualizado = opcion;
-                            Invalidate();
+                            this.Invoke(new Action(() => Invalidate()));
                             return;
                         }
                         else
@@ -628,10 +598,10 @@ namespace BDGameQuiz
                 }
             }
 
-            Responder(opcion);
+            await ResponderAsync(opcion);
         }
 
-        private void Responder(int opcion)
+        private async Task ResponderAsync(int opcion)
         {
             try { player.controls.stop(); } catch { }
 
@@ -640,20 +610,20 @@ namespace BDGameQuiz
 
             var preguntaActual = preguntas[indicePregunta];
 
-            indiceSeleccionado = opcion;
-            esperandoSiguientePregunta = true;
+            this.Invoke(new Action(() => {
+                indiceSeleccionado = opcion;
+                esperandoSiguientePregunta = true;
+                Invalidate();
+            }));
 
             bool esCorrecto = opcion == preguntaActual.Correcta;
 
             if (esCorrecto)
             {
                 score++;
-                ActualizarPuntajePartida();
             }
 
-            GuardarDetallePartida(preguntaActual.IdPregunta, esCorrecto);
-
-            Invalidate();
+            await EnviarRespuestaAsync(preguntaActual.Id, opcion);
 
             Timer timer = new Timer();
             timer.Interval = 800;
@@ -676,23 +646,55 @@ namespace BDGameQuiz
             timer.Start();
         }
 
-        private void CrearPartida()
+        private async Task EnviarRespuestaAsync(int idPregunta, int opcion)
         {
             try
             {
-                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
+                var preguntaActual = preguntas[indicePregunta];
+
+                var answerData = new
                 {
-                    conn.Open();
+                    pregunta_id = idPregunta,
+                    opcion = opcion,
+                    es_correcto = opcion == preguntaActual.Correcta
+                };
 
-                    string query = @"INSERT INTO partida (ID_Jugador, ID_Cat, Puntaje, Fecha, Hora) 
-                                     VALUES (@jugador, @cat, 0, CURDATE(), CURTIME())";
+                string json = JsonSerializer.Serialize(answerData);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                    MySqlCommand cmd = new MySqlCommand(query, conn);
-                    cmd.Parameters.AddWithValue("@jugador", idJugador);
-                    cmd.Parameters.AddWithValue("@cat", idCategoria);
+                await httpClient.PostAsync($"{API_BASE_URL}/games/{idPartida}/answer", content);
+                Console.WriteLine("ID PARTIDA: " + idPartida);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error al enviar respuesta: " + ex.Message);
+            }
+        }
 
-                    cmd.ExecuteNonQuery();
-                    idPartida = (int)cmd.LastInsertedId;
+        private async Task CrearPartidaAsync()
+        {
+            try
+            {
+                var partidaData = new
+                {
+                    jugador_id = idJugador,
+                    categoria_id = idCategoria,
+                    puntaje = 0
+                };
+
+                string json = JsonSerializer.Serialize(partidaData);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                HttpResponseMessage response = await httpClient.PostAsync($"{API_BASE_URL}/games/", content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    string responseJson = await response.Content.ReadAsStringAsync();
+                    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    var partidaCreada = JsonSerializer.Deserialize<PartidaResponse>(responseJson, options);
+
+                    if (partidaCreada != null)
+                        idPartida = partidaCreada.Id;
                 }
             }
             catch (Exception ex)
@@ -702,73 +704,11 @@ namespace BDGameQuiz
             }
         }
 
-        private void ActualizarPuntajePartida()
-        {
-            try
-            {
-                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
-                {
-                    conn.Open();
-
-                    string query = "UPDATE partida SET Puntaje = @score WHERE ID_Partida = @id";
-
-                    MySqlCommand cmd = new MySqlCommand(query, conn);
-                    cmd.Parameters.AddWithValue("@score", score);
-                    cmd.Parameters.AddWithValue("@id", idPartida);
-
-                    cmd.ExecuteNonQuery();
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error al actualizar puntaje: " + ex.Message);
-            }
-        }
-
-        private void GuardarDetallePartida(int idPregunta, bool esCorrecto)
-        {
-            try
-            {
-                using (MySqlConnection conn = new MySqlConnection("Server=127.0.0.1;Database=pruebaproyecto;User ID=root;Password=Furay1214@;"))
-                {
-                    conn.Open();
-
-                    string queryGetNext = @"SELECT IFNULL(MAX(ID_Detalle), 0) + 1
-                                            FROM detalle_partida
-                                            WHERE ID_Partida = @partida";
-
-                    MySqlCommand cmdGetNext = new MySqlCommand(queryGetNext, conn);
-                    cmdGetNext.Parameters.AddWithValue("@partida", idPartida);
-
-                    int siguienteDetalle = Convert.ToInt32(cmdGetNext.ExecuteScalar());
-
-                    string query = @"INSERT INTO detalle_partida
-                                     (ID_Partida, ID_Detalle, ID_Cat, ID_Preg, Es_Acierto)
-                                     VALUES (@partida, @detalle, @cat, @preg, @acierto)";
-
-                    MySqlCommand cmd = new MySqlCommand(query, conn);
-                    cmd.Parameters.AddWithValue("@partida", idPartida);
-                    cmd.Parameters.AddWithValue("@detalle", siguienteDetalle);
-                    cmd.Parameters.AddWithValue("@cat", idCategoria);
-                    cmd.Parameters.AddWithValue("@preg", idPregunta);
-                    cmd.Parameters.AddWithValue("@acierto", esCorrecto ? 1 : 0);
-
-                    cmd.ExecuteNonQuery();
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error al guardar detalle de la pregunta: " + ex.Message);
-            }
-        }
-
         private void TerminarJuego()
         {
             LiberarImagenes();
 
             try { player.controls.stop(); } catch { }
-
-            ActualizarPuntajePartida();
 
             resultados r = new resultados(score, preguntas.Count, nombreJugador, idPartida);
             r.Show();
@@ -789,12 +729,20 @@ namespace BDGameQuiz
         }
     }
 
-    public class Pregunta
+    public class PreguntaAPI
     {
-        public int IdPregunta { get; set; }
-        public string Enunciado { get; set; }
-        public string[] Opciones { get; set; } = new string[4];
+        public int Id { get; set; }
+        public string Pregunta { get; set; }
+        public List<string> Opciones { get; set; } = new List<string>();
         public int Correcta { get; set; } = -1;
         public string Tipo { get; set; } = "texto";
+    }
+
+    public class PartidaResponse
+    {
+        public int Id { get; set; }
+        public int JugadorId { get; set; }
+        public int CategoriaId { get; set; }
+        public int Puntaje { get; set; }
     }
 }
