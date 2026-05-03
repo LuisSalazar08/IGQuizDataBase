@@ -49,18 +49,23 @@ namespace BDGameQuiz
         private static readonly HttpClient httpClient = new HttpClient();
         private const string API_BASE_URL = "http://192.168.56.1:8080";
 
-        public juego(int cat, int idJugador, string nombreJugador)
+        private int salaId;
+        private bool esHost;
+
+        public juego(int cat, int idJugador, string nombreJugador, int salaId, bool esHost)
         {
             InitializeComponent();
+
+            this.idCategoria = cat;
+            this.idJugador = idJugador;
+            this.nombreJugador = nombreJugador;
+            this.salaId = salaId;
+            this.esHost = esHost;
 
             this.WindowState = FormWindowState.Maximized;
             this.FormBorderStyle = FormBorderStyle.None;
             this.DoubleBuffered = true;
             this.KeyPreview = true;
-
-            this.idCategoria = cat;
-            this.idJugador = idJugador;
-            this.nombreJugador = nombreJugador;
 
             this.Controls.Clear();
 
@@ -241,7 +246,7 @@ namespace BDGameQuiz
                 if (preguntas.Count == 0)
                 {
                     MessageBox.Show($"No hay preguntas disponibles para esta categoría (ID: {idCategoria}).");
-                    VolverAlMenu();
+                    VolverAlLobby();
                     return;
                 }
 
@@ -252,7 +257,7 @@ namespace BDGameQuiz
             catch (Exception ex)
             {
                 MessageBox.Show("Error al cargar preguntas: " + ex.Message);
-                VolverAlMenu();
+                VolverAlLobby();
             }
         }
 
@@ -326,6 +331,18 @@ namespace BDGameQuiz
             {
                 imagenesOpcionesActuales[i] = CargarImagen(p.Opciones[i]);
             }
+        }
+
+        private void VolverAlLobby()
+        {
+            LiberarImagenes();
+
+            try { player.controls.stop(); } catch { }
+
+            Lobby lobby = new Lobby(salaId, idJugador, esHost);
+            lobby.Show();
+
+            this.Close();
         }
 
         private void MostrarPregunta()
@@ -662,8 +679,18 @@ namespace BDGameQuiz
                 string json = JsonSerializer.Serialize(answerData);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                await httpClient.PostAsync($"{API_BASE_URL}/games/{idPartida}/answer", content);
-                Console.WriteLine("ID PARTIDA: " + idPartida);
+                Console.WriteLine($"ID PARTIDA: {idPartida}");
+                Console.WriteLine($"Enviando JSON: {json}");
+
+                var response = await httpClient.PostAsync(
+                    $"{API_BASE_URL}/games/{idPartida}/answer",
+                    content
+                );
+
+                Console.WriteLine("Status: " + response.StatusCode);
+
+                string responseBody = await response.Content.ReadAsStringAsync();
+                Console.WriteLine("Response: " + responseBody);
             }
             catch (Exception ex)
             {
@@ -679,6 +706,7 @@ namespace BDGameQuiz
                 {
                     jugador_id = idJugador,
                     categoria_id = idCategoria,
+                    sala_id = salaId,
                     puntaje = 0
                 };
 
@@ -710,23 +738,12 @@ namespace BDGameQuiz
 
             try { player.controls.stop(); } catch { }
 
-            resultados r = new resultados(score, preguntas.Count, nombreJugador, idPartida);
-            r.Show();
-
+            EsperaFinal espera = new EsperaFinal(idPartida, nombreJugador, idJugador, idCategoria);
+            espera.Show();
             this.Close();
+
         }
 
-        private void VolverAlMenu()
-        {
-            LiberarImagenes();
-
-            try { player.controls.stop(); } catch { }
-
-            menu m = new menu(nombreJugador, idJugador);
-            m.Show();
-
-            this.Close();
-        }
     }
 
     public class PreguntaAPI

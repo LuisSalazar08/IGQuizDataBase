@@ -109,6 +109,24 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="EsperaFinal.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="EsperaFinal.Designer.cs">
+      <DependentUpon>EsperaFinal.cs</DependentUpon>
+    </Compile>
+    <Compile Include="MenuCategorias.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="MenuCategorias.Designer.cs">
+      <DependentUpon>MenuCategorias.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Lobby.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Lobby.Designer.cs">
+      <DependentUpon>Lobby.cs</DependentUpon>
+    </Compile>
     <Compile Include="historial.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -133,14 +151,11 @@
     <Compile Include="juego.Designer.cs">
       <DependentUpon>juego.cs</DependentUpon>
     </Compile>
-    <Compile Include="menu.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="menu.Designer.cs">
-      <DependentUpon>menu.cs</DependentUpon>
-    </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <EmbeddedResource Include="EsperaFinal.resx">
+      <DependentUpon>EsperaFinal.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="historial.resx">
       <DependentUpon>historial.cs</DependentUpon>
     </EmbeddedResource>
@@ -150,8 +165,11 @@
     <EmbeddedResource Include="juego.resx">
       <DependentUpon>juego.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="menu.resx">
-      <DependentUpon>menu.cs</DependentUpon>
+    <EmbeddedResource Include="Lobby.resx">
+      <DependentUpon>Lobby.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="MenuCategorias.resx">
+      <DependentUpon>MenuCategorias.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>

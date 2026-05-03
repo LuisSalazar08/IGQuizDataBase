@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Windows.Forms;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 
 namespace BDGameQuiz
 {
@@ -18,21 +18,23 @@ namespace BDGameQuiz
         int idPartidaReciente;
         string nombreJugador;
 
-        int scrollY = 0;
-        int partidaSeleccionada = -1;
-        int maxScroll = 0;
+        int salaId;
+        int jugadorId;
 
-        List<string> preguntas = new List<string>();
-        List<bool> resultadosLista = new List<bool>();
+        bool todosListos = false;
+        Timer timerEstado;
 
-        public resultados(int scoreFinal, int totalPreguntas, string nombreJugador, int idPartida)
+        public resultados(int scoreFinal, int totalPreguntas, string nombreJugador, int idPartida, int salaId, int jugadorId)
         {
             InitializeComponent();
 
-            score = scoreFinal;
-            total = totalPreguntas;
+            this.score = scoreFinal;
+            this.total = totalPreguntas;
             this.nombreJugador = nombreJugador;
-            idPartidaReciente = idPartida;
+            this.idPartidaReciente = idPartida;
+
+            this.salaId = salaId;
+            this.jugadorId = jugadorId;
 
             this.WindowState = FormWindowState.Maximized;
             this.DoubleBuffered = true;
@@ -40,81 +42,100 @@ namespace BDGameQuiz
             int porcentaje = (score * 100 / total);
             lblScore.Text = $"{nombreJugador}\n{score}/{total} puntos\n{porcentaje}% de aciertos";
 
-            ScoresView.Visible = true;
-
-
-            this.Load += async (s, e) =>
+            this.Load += (s, e) =>
             {
-                CargarHistorial();
-
-                if (idPartidaReciente > 0)
-                {
-                    await Task.Delay(200);
-
-                    foreach (DataGridViewRow row in ScoresView.Rows)
-                    {
-                        if (row.Cells[0].Value != null &&
-                            Convert.ToInt32(row.Cells[0].Value) == idPartidaReciente)
-                        {
-                            row.Selected = true;
-                            partidaSeleccionada = idPartidaReciente;
-                            CargarDetalle(idPartidaReciente);
-                            break;
-                        }
-                    }
-                }
+                CargarResultadosSala();
             };
 
-            if (ScoresView.Rows.Count > 0 && idPartidaReciente > 0)
-            {
-                foreach (DataGridViewRow row in ScoresView.Rows)
-                {
-                    if (row.Cells[0].Value != null && Convert.ToInt32(row.Cells[0].Value) == idPartidaReciente)
-                    {
-                        row.Selected = true;
-                        partidaSeleccionada = idPartidaReciente;
-                        CargarDetalle(idPartidaReciente);
-                        break;
-                    }
-                }
-            }
+            IniciarPollingEstado();
         }
 
-        async void CargarHistorial()
+        // ESPERAR A TODOS
+        private void IniciarPollingEstado()
+        {
+            timerEstado = new Timer();
+            timerEstado.Interval = 1500;
+
+            timerEstado.Tick += async (s, e) =>
+            {
+                await VerificarEstadoSala();
+            };
+
+            timerEstado.Start();
+        }
+
+        private async Task VerificarEstadoSala()
         {
             try
             {
-                string url = $"{API_BASE_URL}/games/?limit=20";
+                var res = await httpClient.GetAsync($"{API_BASE_URL}/rooms/{salaId}/status");
+
+                if (!res.IsSuccessStatusCode) return;
+
+                var json = await res.Content.ReadAsStringAsync();
+
+                var estado = JsonSerializer.Deserialize<EstadoSala>(json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                if (estado == null) return;
+
+                if (estado.estado == "finalizado")
+                {
+                    todosListos = true;
+                }
+            }
+            catch { }
+        }
+
+        // RESULTADOS DE LA SALA
+        async void CargarResultadosSala()
+        {
+            try
+            {
+                string url = $"{API_BASE_URL}/rooms/{salaId}/results";
 
                 HttpResponseMessage response = await httpClient.GetAsync(url);
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    MessageBox.Show("Error al obtener historial");
+                    MessageBox.Show("Error al obtener resultados");
                     return;
                 }
 
                 string json = await response.Content.ReadAsStringAsync();
 
-                var historial = JsonSerializer.Deserialize<List<HistorialAPI>>(json,
+                var lista = JsonSerializer.Deserialize<List<ResultadoSalaAPI>>(json,
                     new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
                 ScoresView.Columns.Clear();
                 ScoresView.Rows.Clear();
 
-                ScoresView.Columns.Add("ID_Partida", "ID");
+                ScoresView.Columns.Add("ID", "ID");
                 ScoresView.Columns.Add("Jugador", "Jugador");
-                ScoresView.Columns.Add("Categoria", "Categoría");
                 ScoresView.Columns.Add("Puntaje", "Puntaje");
+                ScoresView.Columns.Add("Total", "Total");
 
-                foreach (var item in historial)
+                int posicion = 1;
+
+                foreach (var item in lista)
                 {
-                    ScoresView.Rows.Add(
-                        item.ID_Partida,
-                        item.Nombre,
-                        item.Categoria,
-                        item.Puntaje
+                    int rowIndex = ScoresView.Rows.Add(
+                        item.id_partida,
+                        $"{posicion}. {item.nombre}",
+                        item.puntaje,
+                        item.total
                     );
+
+                    var fila = ScoresView.Rows[rowIndex];
+
+                    if (posicion == 1)
+                        fila.DefaultCellStyle.BackColor = Color.Gold;
+                    else if (posicion == 2)
+                        fila.DefaultCellStyle.BackColor = Color.Silver;
+                    else if (posicion == 3)
+                        fila.DefaultCellStyle.BackColor = Color.Peru;
+
+                    posicion++;
                 }
 
                 ScoresView.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
@@ -124,47 +145,11 @@ namespace BDGameQuiz
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error al cargar historial: " + ex.Message);
+                MessageBox.Show("Error: " + ex.Message);
             }
         }
 
-        async void CargarDetalle(int idPartida)
-        {
-            preguntas.Clear();
-            resultadosLista.Clear();
-
-            try
-            {
-                string url = $"{API_BASE_URL}/games/{idPartida}/details";
-
-                HttpResponseMessage response = await httpClient.GetAsync(url);
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    MessageBox.Show("Error al obtener detalle");
-                    return;
-                }
-
-                string json = await response.Content.ReadAsStringAsync();
-
-                var detalles = JsonSerializer.Deserialize<List<DetalleAPI>>(json,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-                foreach (var d in detalles)
-                {
-                    preguntas.Add(d.Enunciado);
-                    resultadosLista.Add(d.Es_Acierto);
-                }
-
-                scrollY = 0;
-                this.Invalidate();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error al cargar detalle: " + ex.Message);
-            }
-        }
-
+        // DETALLE (DOBLE CLICK)
         private void ScoresView_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex >= 0 && ScoresView.Rows[e.RowIndex].Cells[0].Value != null)
@@ -176,88 +161,21 @@ namespace BDGameQuiz
             }
         }
 
+        // VOLVER AL LOBBY
         private void btnMenu_Click_1(object sender, EventArgs e)
         {
-            Inicio inicio = new Inicio();
-            inicio.Show();
+            if (!todosListos)
+            {
+                MessageBox.Show("Espera a que todos los jugadores terminen");
+                return;
+            }
+
+            Lobby lobby = new Lobby(salaId, jugadorId, false);
+            lobby.Show();
             this.Close();
         }
 
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            base.OnPaint(e);
-
-            if (partidaSeleccionada != -1 && preguntas.Count > 0)
-            {
-                Graphics g = e.Graphics;
-
-                int detalleX = this.Width - 450;
-                int detalleY = lblScore.Bottom + 20;
-                int detalleAncho = 430;
-                int detalleAlto = this.Height - detalleY - 20;
-
-                g.FillRectangle(new SolidBrush(Color.FromArgb(240, 240, 240)), detalleX, detalleY, detalleAncho, detalleAlto);
-                g.DrawRectangle(Pens.Gray, detalleX, detalleY, detalleAncho, detalleAlto);
-
-                g.DrawString($"Detalle Partida #{partidaSeleccionada}",
-                    new Font("Segoe UI", 14, FontStyle.Bold),
-                    Brushes.DarkBlue,
-                    detalleX + 10, detalleY + 10);
-
-                int aciertos = resultadosLista.FindAll(r => r).Count;
-                int errores = preguntas.Count - aciertos;
-
-                g.DrawString($"✅ {aciertos}   ❌ {errores}",
-                    new Font("Segoe UI", 10, FontStyle.Bold),
-                    Brushes.Black,
-                    detalleX + 10, detalleY + 50);
-
-                Rectangle clipRect = new Rectangle(detalleX + 5, detalleY + 80, detalleAncho - 10, detalleAlto - 100);
-                g.SetClip(clipRect);
-
-                int y = detalleY + 80 - scrollY;
-
-                for (int i = 0; i < preguntas.Count; i++)
-                {
-                    bool acierto = resultadosLista[i];
-                    Color color = acierto ? Color.Green : Color.Red;
-
-                    string estado = acierto ? "Correcta" : "Incorrecta";
-                    string texto = $"{i + 1}. {preguntas[i]} [{estado}]";
-
-                    g.DrawString(texto, new Font("Segoe UI", 9), new SolidBrush(color), detalleX + 15, y);
-
-                    y += 28;
-                }
-
-                g.ResetClip();
-
-                if (preguntas.Count > 12)
-                {
-                    g.DrawString("Usa la rueda del mouse",
-                        new Font("Segoe UI", 8),
-                        Brushes.Gray,
-                        detalleX + 10, detalleY + detalleAlto - 25);
-                }
-            }
-        }
-
-        protected override void OnMouseWheel(MouseEventArgs e)
-        {
-            base.OnMouseWheel(e);
-
-            if (partidaSeleccionada != -1 && preguntas.Count > 0)
-            {
-                int areaAltura = this.Height - (lblScore.Bottom + 120);
-                maxScroll = Math.Max(0, (preguntas.Count * 28) - areaAltura);
-
-                scrollY -= e.Delta / 3;
-                scrollY = Math.Max(0, Math.Min(scrollY, maxScroll));
-
-                this.Invalidate();
-            }
-        }
-
+        // ESC
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
             if (keyData == Keys.Escape)
@@ -270,24 +188,18 @@ namespace BDGameQuiz
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
-        protected override void OnResize(EventArgs e)
+        // MODELOS
+        class ResultadoSalaAPI
         {
-            base.OnResize(e);
-            this.Invalidate();
+            public int id_partida { get; set; }
+            public string nombre { get; set; }
+            public int puntaje { get; set; }
+            public int total { get; set; }
         }
 
-        public class HistorialAPI
+        public class EstadoSala
         {
-            public int ID_Partida { get; set; }
-            public string Nombre { get; set; }
-            public string Categoria { get; set; }
-            public int Puntaje { get; set; }
-        }
-
-        public class DetalleAPI
-        {
-            public string Enunciado { get; set; }
-            public bool Es_Acierto { get; set; }
+            public string estado { get; set; }
         }
     }
 }
