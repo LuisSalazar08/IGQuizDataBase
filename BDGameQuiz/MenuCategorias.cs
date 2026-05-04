@@ -15,7 +15,7 @@ namespace BDGameQuiz
         private int jugadorId;
 
         private static readonly HttpClient http = new HttpClient();
-        private const string API = "http://192.168.56.1:8080";
+        private const string API = "http://10.103.151.54:8080";
 
         private List<Categoria> categorias = new List<Categoria>();
 

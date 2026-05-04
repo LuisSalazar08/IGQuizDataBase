@@ -12,7 +12,7 @@ namespace BDGameQuiz
     public partial class historial : Form
     {
         private static readonly HttpClient httpClient = new HttpClient();
-        private const string API_BASE_URL = "http://192.168.56.1:8080";
+        private const string API_BASE_URL = "http://10.103.151.54:8080";
 
         int idPartida;
 

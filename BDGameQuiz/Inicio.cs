@@ -10,7 +10,7 @@ namespace BDGameQuiz
 {
     public partial class Inicio : Form
     {
-        private const string API = "http://192.168.56.1:8080";
+        private const string API = "http://10.103.151.54:8080";
 
         public Inicio()
         {
@@ -118,7 +118,7 @@ namespace BDGameQuiz
                 var response = await client.PostAsync($"{API}/rooms", content);
 
                 var responseJson = await response.Content.ReadAsStringAsync();
-                MessageBox.Show(responseJson);
+                //MessageBox.Show(responseJson);
                 return JsonConvert.DeserializeObject<SalaResponse>(responseJson);
             }
         }
@@ -192,5 +192,9 @@ namespace BDGameQuiz
 
         }
 
+        private void panel1_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
     }
 }

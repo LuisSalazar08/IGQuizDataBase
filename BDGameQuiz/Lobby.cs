@@ -16,9 +16,13 @@ namespace BDGameQuiz
         private int totalJugadores = 0;
         private int jugadoresListos = 0;
         private string categoriaActual = null;
+        // Agrega aquí:
+        private int _prevTotal = -1;
+        private int _prevListos = -1;
+        private string _prevCategoria = null;
 
         private static readonly HttpClient http = new HttpClient();
-        private const string API = "http://192.168.56.1:8080";
+        private const string API = "http://10.103.151.54:8080";
 
         private Timer timer;
 
@@ -54,6 +58,15 @@ namespace BDGameQuiz
         public Lobby(int salaId, int jugadorId, bool esHost)
         {
             InitializeComponent();
+
+            this.DoubleBuffered = true;
+            this.SetStyle(
+                ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.UserPaint |
+                ControlStyles.OptimizedDoubleBuffer,
+                true
+            );
+            this.UpdateStyles();
 
             this.WindowState = FormWindowState.Maximized;
             this.FormBorderStyle = FormBorderStyle.None;
@@ -101,7 +114,16 @@ namespace BDGameQuiz
                 jugadoresListos = estado.listos;
                 categoriaActual = estado.categoria;
 
-                Invalidate();
+                //Invalidate();
+                if (estado.total != _prevTotal ||
+                    estado.listos != _prevListos ||
+                    estado.categoria != _prevCategoria)
+                {
+                    _prevTotal = estado.total;
+                    _prevListos = estado.listos;
+                    _prevCategoria = estado.categoria;
+                    Invalidate();
+                }
 
                 if (estado.estado == "jugando")
                 {
@@ -140,7 +162,7 @@ namespace BDGameQuiz
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
-            var fontInfo = new Font("Arial", 90, FontStyle.Bold);
+            var fontInfo = new Font("Arial", 70, FontStyle.Bold);
 
             string txtJugadores = $"Jugadores: {totalJugadores}";
             string txtListos = $"Listos: {jugadoresListos}";
