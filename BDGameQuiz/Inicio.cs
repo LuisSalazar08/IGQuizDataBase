@@ -61,7 +61,7 @@ namespace BDGameQuiz
                 return;
             }
 
-            Lobby lobby = new Lobby(salaId, jugador.id, false);
+            Lobby lobby = new Lobby(salaId, jugador.id, false, nombreJugador);
             lobby.Show();
             this.Hide();
         }
@@ -118,7 +118,6 @@ namespace BDGameQuiz
                 var response = await client.PostAsync($"{API}/rooms", content);
 
                 var responseJson = await response.Content.ReadAsStringAsync();
-                MessageBox.Show(responseJson);
                 return JsonConvert.DeserializeObject<SalaResponse>(responseJson);
             }
         }
@@ -182,7 +181,7 @@ namespace BDGameQuiz
 
             var sala = await CrearSala(jugador.id);
 
-            Lobby lobby = new Lobby(sala.sala_id, jugador.id, true);
+            Lobby lobby = new Lobby(sala.sala_id, jugador.id, true, nombreJugador);
             lobby.Show();
             this.Hide();
         }

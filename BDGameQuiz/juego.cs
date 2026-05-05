@@ -339,7 +339,7 @@ namespace BDGameQuiz
 
             try { player.controls.stop(); } catch { }
 
-            Lobby lobby = new Lobby(salaId, idJugador, esHost);
+            Lobby lobby = new Lobby(salaId, idJugador, esHost, nombreJugador);
             lobby.Show();
 
             this.Close();
@@ -738,7 +738,7 @@ namespace BDGameQuiz
 
             try { player.controls.stop(); } catch { }
 
-            EsperaFinal espera = new EsperaFinal(idPartida, nombreJugador, idJugador, idCategoria);
+            EsperaFinal espera = new EsperaFinal(idPartida, nombreJugador, idJugador, salaId);
             espera.Show();
             this.Close();
 

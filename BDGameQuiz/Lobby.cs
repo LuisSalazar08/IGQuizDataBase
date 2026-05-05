@@ -16,6 +16,10 @@ namespace BDGameQuiz
         private int totalJugadores = 0;
         private int jugadoresListos = 0;
         private string categoriaActual = null;
+		private int _prevTotal = -1;
+		private int _prevListos = -1;
+		private string _prevCategoria = null;
+        private string nombreJugador;
 
         private static readonly HttpClient http = new HttpClient();
         private const string API = "http://192.168.56.1:8080";
@@ -51,17 +55,27 @@ namespace BDGameQuiz
 
         }
 
-        public Lobby(int salaId, int jugadorId, bool esHost)
+        public Lobby(int salaId, int jugadorId, bool esHost, string nombreJugador)
         {
             InitializeComponent();
-
-            this.WindowState = FormWindowState.Maximized;
-            this.FormBorderStyle = FormBorderStyle.None;
-            this.BackgroundImage = global::BDGameQuiz.Properties.Resources.fondo;
 
             this.salaId = salaId;
             this.jugadorId = jugadorId;
             this.esHost = esHost;
+            this.nombreJugador = nombreJugador;
+
+            this.DoubleBuffered = true;
+			this.SetStyle(
+				ControlStyles.AllPaintingInWmPaint |
+				ControlStyles.UserPaint |
+				ControlStyles.OptimizedDoubleBuffer,
+				true
+			);
+			this.UpdateStyles();
+
+			this.WindowState = FormWindowState.Maximized;
+            this.FormBorderStyle = FormBorderStyle.None;
+            this.BackgroundImage = global::BDGameQuiz.Properties.Resources.fondo;
 
             this.Resize += (s, e) => { CalcularLayout(); Invalidate(); };
             this.Load += (s, e) => { CalcularLayout(); };
@@ -101,16 +115,24 @@ namespace BDGameQuiz
                 jugadoresListos = estado.listos;
                 categoriaActual = estado.categoria;
 
-                Invalidate();
+				if (estado.total != _prevTotal ||
+	                estado.listos != _prevListos ||
+	                estado.categoria != _prevCategoria)
+				{
+					_prevTotal = estado.total;
+					_prevListos = estado.listos;
+					_prevCategoria = estado.categoria;
+					Invalidate();
+				}
 
-                if (estado.estado == "jugando")
+				if (estado.estado == "jugando")
                 {
                     timer.Stop();
 
                     juego j = new juego(
                         estado.categoria_id ?? 1,
                         jugadorId,
-                        "Jugador",
+                        nombreJugador,
                         salaId,
                         esHost
                     );
@@ -140,7 +162,7 @@ namespace BDGameQuiz
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
-            var fontInfo = new Font("Arial", 90, FontStyle.Bold);
+            var fontInfo = new Font("Arial", 70, FontStyle.Bold);
 
             string txtJugadores = $"Jugadores: {totalJugadores}";
             string txtListos = $"Listos: {jugadoresListos}";
@@ -162,9 +184,9 @@ namespace BDGameQuiz
             
             var g = e.Graphics;
 
-            g.DrawString(txtJugadores, fontInfo, Brushes.White, centerX, y1, sf);
-            g.DrawString(txtListos, fontInfo, Brushes.White, centerX, y2, sf);
-            g.DrawString(txtCategoria, fontInfo, Brushes.White, centerX, y3, sf);
+            g.DrawString(txtJugadores, fontInfo, Brushes.Black, centerX, y1, sf);
+            g.DrawString(txtListos, fontInfo, Brushes.Black, centerX, y2, sf);
+            g.DrawString(txtCategoria, fontInfo, Brushes.Black, centerX, y3, sf);
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             var fontSala = new Font("Arial", 30, FontStyle.Bold);
 
@@ -177,7 +199,7 @@ namespace BDGameQuiz
             g.DrawString(
                 txtSala,
                 fontSala,
-                Brushes.White,
+                Brushes.Black,
                 new Rectangle(0, 20, ClientSize.Width - 30, 40),
                 sfDerecha
             );

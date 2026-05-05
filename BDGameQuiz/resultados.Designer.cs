@@ -28,113 +28,56 @@
         /// </summary>
         private void InitializeComponent()
         {
-            System.Windows.Forms.TableLayoutPanel resPanel;
             this.lblScore = new System.Windows.Forms.Label();
-            this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.btnMenu = new System.Windows.Forms.Button();
-            this.ScoresView = new System.Windows.Forms.DataGridView();
-            resPanel = new System.Windows.Forms.TableLayoutPanel();
-            resPanel.SuspendLayout();
-            this.tableLayoutPanel1.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.ScoresView)).BeginInit();
             this.SuspendLayout();
-            // 
-            // resPanel
-            // 
-            resPanel.BackColor = System.Drawing.Color.Transparent;
-            resPanel.ColumnCount = 1;
-            resPanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            resPanel.Controls.Add(this.lblScore, 0, 0);
-            resPanel.Controls.Add(this.tableLayoutPanel1, 0, 1);
-            resPanel.Dock = System.Windows.Forms.DockStyle.Fill;
-            resPanel.Location = new System.Drawing.Point(0, 0);
-            resPanel.Name = "resPanel";
-            resPanel.RowCount = 2;
-            resPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
-            resPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
-            resPanel.Size = new System.Drawing.Size(800, 450);
-            resPanel.TabIndex = 0;
             // 
             // lblScore
             // 
+            this.lblScore.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)));
             this.lblScore.AutoSize = true;
             this.lblScore.BackColor = System.Drawing.Color.Transparent;
-            this.lblScore.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.lblScore.Dock = System.Windows.Forms.DockStyle.Fill;
             this.lblScore.Font = new System.Drawing.Font("Times New Roman", 48F, ((System.Drawing.FontStyle)((System.Drawing.FontStyle.Bold | System.Drawing.FontStyle.Italic))), System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblScore.Location = new System.Drawing.Point(3, 0);
+            this.lblScore.Location = new System.Drawing.Point(437, 190);
             this.lblScore.Name = "lblScore";
-            this.lblScore.Size = new System.Drawing.Size(794, 225);
-            this.lblScore.TabIndex = 0;
+            this.lblScore.Size = new System.Drawing.Size(440, 108);
+            this.lblScore.TabIndex = 2;
             this.lblScore.Text = "Resultado";
             this.lblScore.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             // 
-            // tableLayoutPanel1
-            // 
-            this.tableLayoutPanel1.BackColor = System.Drawing.Color.Transparent;
-            this.tableLayoutPanel1.BackgroundImage = global::BDGameQuiz.Properties.Resources.fondo;
-            this.tableLayoutPanel1.ColumnCount = 2;
-            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 71.78841F));
-            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 28.21159F));
-            this.tableLayoutPanel1.Controls.Add(this.btnMenu, 1, 0);
-            this.tableLayoutPanel1.Controls.Add(this.ScoresView, 0, 0);
-            this.tableLayoutPanel1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.tableLayoutPanel1.Location = new System.Drawing.Point(3, 228);
-            this.tableLayoutPanel1.Name = "tableLayoutPanel1";
-            this.tableLayoutPanel1.RowCount = 2;
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 96.34703F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 3.652968F));
-            this.tableLayoutPanel1.Size = new System.Drawing.Size(794, 219);
-            this.tableLayoutPanel1.TabIndex = 1;
-            // 
             // btnMenu
             // 
-            this.btnMenu.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.btnMenu.Anchor = System.Windows.Forms.AnchorStyles.None;
             this.btnMenu.Font = new System.Drawing.Font("Times New Roman", 36F, System.Drawing.FontStyle.Italic, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btnMenu.Location = new System.Drawing.Point(572, 3);
+            this.btnMenu.Location = new System.Drawing.Point(510, 456);
+            this.btnMenu.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.btnMenu.Name = "btnMenu";
-            this.btnMenu.Size = new System.Drawing.Size(219, 205);
-            this.btnMenu.TabIndex = 0;
+            this.btnMenu.Size = new System.Drawing.Size(286, 237);
+            this.btnMenu.TabIndex = 3;
             this.btnMenu.Text = "Menu";
             this.btnMenu.UseVisualStyleBackColor = true;
             this.btnMenu.Click += new System.EventHandler(this.btnMenu_Click_1);
             // 
-            // ScoresView
-            // 
-            this.ScoresView.BackgroundColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(224)))), ((int)(((byte)(192)))));
-            this.ScoresView.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            this.ScoresView.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.ScoresView.Location = new System.Drawing.Point(3, 3);
-            this.ScoresView.Name = "ScoresView";
-            this.ScoresView.RowHeadersWidth = 51;
-            this.ScoresView.RowTemplate.Height = 24;
-            this.ScoresView.Size = new System.Drawing.Size(563, 205);
-            this.ScoresView.TabIndex = 1;
-            this.ScoresView.CellDoubleClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.ScoresView_CellDoubleClick);
-            // 
             // resultados
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.SystemColors.ActiveBorder;
             this.BackgroundImage = global::BDGameQuiz.Properties.Resources.fondo;
-            this.ClientSize = new System.Drawing.Size(800, 450);
-            this.Controls.Add(resPanel);
+            this.ClientSize = new System.Drawing.Size(1372, 880);
+            this.Controls.Add(this.lblScore);
+            this.Controls.Add(this.btnMenu);
+            this.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.Name = "resultados";
             this.Text = "RESULTADOS";
-            resPanel.ResumeLayout(false);
-            resPanel.PerformLayout();
-            this.tableLayoutPanel1.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.ScoresView)).EndInit();
             this.ResumeLayout(false);
+            this.PerformLayout();
 
         }
 
         #endregion
 
         private System.Windows.Forms.Label lblScore;
-        private System.Windows.Forms.TableLayoutPanel tableLayoutPanel1;
         private System.Windows.Forms.Button btnMenu;
-        private System.Windows.Forms.DataGridView ScoresView;
     }
 }
