@@ -23,23 +23,27 @@ namespace BDGameQuiz
 
         bool todosListos = false;
         Timer timerEstado;
+        string ganador;
+        int puntajeGanador;
 
-		public resultados(int scoreFinal, int totalPreguntas, string nombreJugador, int idPartida, int salaId, int jugadorId)
+        public resultados(int scoreFinal, int totalPreguntas, string nombreJugador,int idPartida, int salaId, int jugadorId,string ganador, int puntajeGanador)
 		{
 			InitializeComponent();
 
 			this.score = scoreFinal;
 			this.total = totalPreguntas;
 			this.nombreJugador = nombreJugador;
+            this.ganador = ganador;
+            this.puntajeGanador = puntajeGanador;
 
-			this.WindowState = FormWindowState.Maximized;
+            this.WindowState = FormWindowState.Maximized;
 			this.DoubleBuffered = true;
 
 
 			int porcentaje = total > 0 ? (score * 100 / total) : 0;
 
-			lblScore.Text = $"{nombreJugador}\n{score}/{total} puntos\n{porcentaje}% de aciertos";
-			lblScore.TextAlign = ContentAlignment.MiddleCenter;
+            lblScore.Text = $"{nombreJugador}\n{score}/{total} puntos\n{porcentaje}% de aciertos\n\nGanador: {ganador} ({puntajeGanador} pts)";
+            lblScore.TextAlign = ContentAlignment.MiddleCenter;
 			lblScore.Height = 200;
 
 			this.Load += (s, e) =>
@@ -48,7 +52,7 @@ namespace BDGameQuiz
 				lblScore.Top = (this.ClientSize.Height - lblScore.Height) / 2 - 100;
 
 				btnMenu.Left = (this.ClientSize.Width - btnMenu.Width) / 2;
-				btnMenu.Top = lblScore.Bottom + 40;
+				btnMenu.Top = lblScore.Bottom + 80;
 			};
 		}
 

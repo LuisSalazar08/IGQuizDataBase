@@ -79,13 +79,14 @@ namespace BDGameQuiz
                 {
                     timer.Stop();
 
-                    resultados r = new resultados(
-                        estado.mi_score,
+                    resultados r = new resultados(estado.mi_score,
                         estado.total_preguntas,
                         nombreJugador,
                         idPartida,
                         salaId,
-                        jugadorId
+                        jugadorId,
+                        estado.ganador,
+                        estado.puntaje_ganador
                     );
 
                     r.Show();
@@ -158,6 +159,8 @@ namespace BDGameQuiz
 
             public int mi_score { get; set; }
             public int total_preguntas { get; set; }
+            public string ganador { get; set; }
+            public int puntaje_ganador { get; set; }
         }
 
         public void EsperaFinal_Load(object sender, EventArgs e)
