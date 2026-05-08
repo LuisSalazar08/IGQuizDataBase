@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Drawing;
-using System.Net.Http;
-using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Net.Sockets;
+using System.IO;
 
 namespace BDGameQuiz
 {
@@ -20,9 +19,9 @@ namespace BDGameQuiz
 		private int _prevListos = -1;
 		private string _prevCategoria = null;
         private string nombreJugador;
-
-        private static readonly HttpClient http = new HttpClient();
-        private const string API = "http://192.168.56.1:8080";
+        TcpClient client;
+        StreamReader reader;
+        StreamWriter writer;
 
         private Timer timer;
 
@@ -46,7 +45,17 @@ namespace BDGameQuiz
                 );
 
                 if (result == DialogResult.Yes)
+                {
+
+                    try
+                    {
+                        writer?.Close();
+                        reader?.Close();
+                        client?.Close();
+                    }
+                    catch { }
                     Application.Exit();
+                }
 
                 return true;
             }
@@ -55,7 +64,7 @@ namespace BDGameQuiz
 
         }
 
-        public Lobby(int salaId, int jugadorId, bool esHost, string nombreJugador)
+        public Lobby(int salaId,int jugadorId,bool esHost,string nombreJugador,TcpClient client,StreamReader reader,StreamWriter writer)
         {
             InitializeComponent();
 
@@ -63,6 +72,9 @@ namespace BDGameQuiz
             this.jugadorId = jugadorId;
             this.esHost = esHost;
             this.nombreJugador = nombreJugador;
+            this.client = client;
+            this.reader = reader;
+            this.writer = writer;
 
             this.DoubleBuffered = true;
 			this.SetStyle(
@@ -100,48 +112,60 @@ namespace BDGameQuiz
         {
             try
             {
-                var res = await http.GetAsync($"{API}/rooms/{salaId}/status");
+                await writer.WriteLineAsync($"ROOM_STATUS|{salaId}");
 
-                if (!res.IsSuccessStatusCode) return;
+                string respuesta = await reader.ReadLineAsync();
 
-                var json = await res.Content.ReadAsStringAsync();
+                string[] partes = respuesta.Split('|');
 
-                var estado = JsonSerializer.Deserialize<EstadoSala>(json,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                totalJugadores = int.Parse(partes[1]);
+                jugadoresListos = int.Parse(partes[2]);
 
-                if (estado == null) return;
+                categoriaActual = partes[3];
 
-                totalJugadores = estado.total;
-                jugadoresListos = estado.listos;
-                categoriaActual = estado.categoria;
+                string estadoSala = partes[4];
 
-				if (estado.total != _prevTotal ||
-	                estado.listos != _prevListos ||
-	                estado.categoria != _prevCategoria)
-				{
-					_prevTotal = estado.total;
-					_prevListos = estado.listos;
-					_prevCategoria = estado.categoria;
-					Invalidate();
-				}
+                Invalidate();
 
-				if (estado.estado == "jugando")
+                if (estadoSala == "jugando")
                 {
                     timer.Stop();
 
+                    int idCategoria;
+
+                    if (categoriaActual == "Historia")
+                        idCategoria = 1;
+                    else if (categoriaActual == "Geografía")
+                        idCategoria = 2;
+                    else if (categoriaActual == "Cultura")
+                        idCategoria = 3;
+                    else if (categoriaActual == "Gastronomía")
+                        idCategoria = 4;
+                    else if (categoriaActual == "Arte")
+                        idCategoria = 5;
+                    else if (categoriaActual == "Deportes")
+                        idCategoria = 6;
+                    else if (categoriaActual == "Naturaleza")
+                        idCategoria = 7;
+                    else
+                        idCategoria = 1;
                     juego j = new juego(
-                        estado.categoria_id ?? 1,
+                        idCategoria,
                         jugadorId,
                         nombreJugador,
                         salaId,
                         esHost
                     );
+
                     j.Show();
 
                     this.Close();
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
         }
 
         private void CalcularLayout()
@@ -273,35 +297,37 @@ namespace BDGameQuiz
 
         private async Task MarcarListo()
         {
-            var data = new { jugador_id = jugadorId };
-
-            string json = JsonSerializer.Serialize(data);
-
-            await http.PostAsync(
-                $"{API}/rooms/{salaId}/ready",
-                new StringContent(json, Encoding.UTF8, "application/json")
+            await writer.WriteLineAsync(
+                $"READY|{salaId}|{jugadorId}"
             );
+
+            await reader.ReadLineAsync();
         }
 
         private async Task IniciarPartida()
         {
-            var data = new { jugador_id = jugadorId };
-
-            string json = JsonSerializer.Serialize(data);
-
-            var res = await http.PostAsync(
-                $"{API}/rooms/{salaId}/start",
-                new StringContent(json, Encoding.UTF8, "application/json")
+            await writer.WriteLineAsync(
+                $"START_GAME|{salaId}|{jugadorId}"
             );
 
-            if (!res.IsSuccessStatusCode)
-                MessageBox.Show("Falta categoría o jugadores listos");
+            string respuesta = await reader.ReadLineAsync();
+
+            if (respuesta != "OK")
+            {
+                MessageBox.Show(
+                    "Falta categoría o jugadores listos"
+                );
+            }
         }
 
         private void AbrirMenuCategorias()
         {
-            MenuCategorias menu = new MenuCategorias(salaId, jugadorId);
+            timer.Stop();
+
+            MenuCategorias menu = new MenuCategorias(salaId, jugadorId, client, reader, writer);
             menu.ShowDialog();
+
+            timer.Start();
         }
 
         public class EstadoSala

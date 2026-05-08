@@ -1,32 +1,26 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.Net.Http;
-using System.Text.Json;
-using System.Threading.Tasks;
+using System.IO;
+using System.Net.Sockets;
 using System.Windows.Forms;
 
 namespace BDGameQuiz
 {
     public partial class resultados : Form
     {
-        private static readonly HttpClient httpClient = new HttpClient();
-        private const string API_BASE_URL = "http://192.168.56.1:8080";
-
         int score;
         int total;
-        int idPartidaReciente;
-        string nombreJugador;
-
         int salaId;
         int jugadorId;
-
+        string nombreJugador;
         bool todosListos = false;
-        Timer timerEstado;
         string ganador;
         int puntajeGanador;
+        TcpClient client;
+        StreamReader reader;
+        StreamWriter writer;
 
-        public resultados(int scoreFinal, int totalPreguntas, string nombreJugador,int idPartida, int salaId, int jugadorId,string ganador, int puntajeGanador)
+        public resultados(int scoreFinal, int totalPreguntas, string nombreJugador,int idPartida, int salaId, int jugadorId,string ganador, int puntajeGanador, TcpClient client,StreamReader reader,StreamWriter writer)
 		{
 			InitializeComponent();
 
@@ -34,7 +28,10 @@ namespace BDGameQuiz
 			this.total = totalPreguntas;
 			this.nombreJugador = nombreJugador;
             this.ganador = ganador;
-            this.puntajeGanador = puntajeGanador;
+            this.puntajeGanador = puntajeGanador; 
+            this.client = client;
+            this.reader = reader;
+            this.writer = writer;
 
             this.WindowState = FormWindowState.Maximized;
 			this.DoubleBuffered = true;
@@ -60,6 +57,13 @@ namespace BDGameQuiz
         {
             if (keyData == Keys.Escape)
             {
+                try
+                {
+                    writer?.Close();
+                    reader?.Close();
+                    client?.Close();
+                }
+                catch { }
                 Inicio inicio = new Inicio();
                 inicio.Show();
                 this.Close();
@@ -70,9 +74,19 @@ namespace BDGameQuiz
 
         private void btnMenu_Click_1(object sender, EventArgs e)
         {
-			Inicio inicio = new Inicio();
-			inicio.Show();
-			this.Close();
-		}
+            try
+            {
+                writer?.Close();
+                reader?.Close();
+                client?.Close();
+            }
+            catch { }
+
+            Inicio inicio = new Inicio();
+
+            inicio.Show();
+
+            this.Close();
+        }
     }
 }

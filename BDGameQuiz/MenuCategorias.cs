@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Net.Http;
-using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Net.Sockets;
+using System.IO;
 
 namespace BDGameQuiz
 {
@@ -13,9 +12,9 @@ namespace BDGameQuiz
     {
         private int salaId;
         private int jugadorId;
-
-        private static readonly HttpClient http = new HttpClient();
-        private const string API = "http://192.168.56.1:8080";
+        TcpClient client;
+        StreamReader reader;
+        StreamWriter writer;
 
         private List<Categoria> categorias = new List<Categoria>();
 
@@ -44,20 +43,32 @@ namespace BDGameQuiz
                 );
 
                 if (result == DialogResult.Yes)
+                {
+                    try
+                    {
+                        writer?.Close();
+                        reader?.Close();
+                        client?.Close();
+                    }
+                    catch { }
                     Application.Exit();
-
+                }
                 return true;
             }
 
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
-        public MenuCategorias(int salaId, int jugadorId)
+        public MenuCategorias(int salaId,int jugadorId,TcpClient client,StreamReader reader,StreamWriter writer)
         {
             InitializeComponent();
 
             this.salaId = salaId;
             this.jugadorId = jugadorId;
+
+            this.client = client;
+            this.reader = reader;
+            this.writer = writer;
 
             this.WindowState = FormWindowState.Maximized;
             this.FormBorderStyle = FormBorderStyle.None;
@@ -77,22 +88,29 @@ namespace BDGameQuiz
         {
             try
             {
-                var res = await http.GetAsync($"{API}/categories");
+                await writer.WriteLineAsync("GET_CATEGORIES");
 
-                if (!res.IsSuccessStatusCode)
+                string respuesta = await reader.ReadLineAsync();
+
+                categorias.Clear();
+
+                string[] lista = respuesta.Split('|');
+
+                for (int i = 1; i < lista.Length; i++)
                 {
-                    MessageBox.Show("Error al cargar categorías");
-                    return;
+                    string[] datos = lista[i].Split(',');
+
+                    categorias.Add(new Categoria
+                    {
+                        id_cat = int.Parse(datos[0]),
+                        nombre = datos[1]
+                    });
                 }
-
-                var json = await res.Content.ReadAsStringAsync();
-
-                categorias = JsonSerializer.Deserialize<List<Categoria>>(json,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
                 indiceActual = 0;
 
                 CalcularLayout();
+
                 Invalidate();
             }
             catch (Exception ex)
@@ -237,20 +255,13 @@ namespace BDGameQuiz
         {
             try
             {
-                var data = new
-                {
-                    jugador_id = jugadorId,
-                    categoria_id = categoriaId
-                };
-
-                string json = JsonSerializer.Serialize(data);
-
-                var res = await http.PostAsync(
-                    $"{API}/rooms/{salaId}/set-category",
-                    new StringContent(json, Encoding.UTF8, "application/json")
+                await writer.WriteLineAsync(
+                    $"SET_CATEGORY|{salaId}|{jugadorId}|{categoriaId}"
                 );
 
-                if (!res.IsSuccessStatusCode)
+                string respuesta = await reader.ReadLineAsync();
+
+                if (respuesta != "OK")
                 {
                     MessageBox.Show("Error al elegir categoría");
                     return;

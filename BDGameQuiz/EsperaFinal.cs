@@ -1,9 +1,10 @@
 ﻿using System;
-using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Drawing;
 using System.Windows.Forms;
+using System.Net.Sockets;
+using System.IO;
 
 namespace BDGameQuiz
 {
@@ -11,9 +12,6 @@ namespace BDGameQuiz
     {
         private readonly int idPartida;
         private readonly string nombreJugador;
-
-        private static readonly HttpClient http = new HttpClient();
-        private const string API = "http://192.168.56.1:8080";
 
         private Timer timer;
 
@@ -23,8 +21,11 @@ namespace BDGameQuiz
         private int salaId;
 
         private bool todosListos = false;
+        TcpClient client;
+        StreamReader reader;
+        StreamWriter writer;
 
-        public EsperaFinal(int idPartida, string nombreJugador, int jugadorId, int salaId)
+        public EsperaFinal(int idPartida,string nombreJugador,int jugadorId,int salaId,TcpClient client,StreamReader reader,StreamWriter writer)
         {
             InitializeComponent();
 
@@ -32,6 +33,9 @@ namespace BDGameQuiz
             this.nombreJugador = nombreJugador;
             this.jugadorId = jugadorId;
             this.salaId = salaId;
+            this.client = client;
+            this.reader = reader;
+            this.writer = writer;
 
             this.WindowState = FormWindowState.Maximized;
             this.FormBorderStyle = FormBorderStyle.None;
@@ -60,16 +64,29 @@ namespace BDGameQuiz
         {
             try
             {
-                var res = await http.GetAsync($"{API}/games/{idPartida}/status");
+                await writer.WriteLineAsync(
+                    $"GAME_STATUS|{idPartida}"
+                );
 
-                if (!res.IsSuccessStatusCode) return;
+                string respuesta = await reader.ReadLineAsync();
 
-                var json = await res.Content.ReadAsStringAsync();
+                string[] partes = respuesta.Split('|');
 
-                var estado = JsonSerializer.Deserialize<GameStatus>(json,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (partes.Length < 2)
+                    return;
 
-                if (estado == null) return;
+                string json = partes[1];
+
+                var estado = JsonSerializer.Deserialize<GameStatus>(
+                    json,
+                    new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    }
+                );
+
+                if (estado == null)
+                    return;
 
                 todosListos = estado.todos_terminaron;
 
@@ -79,21 +96,26 @@ namespace BDGameQuiz
                 {
                     timer.Stop();
 
-                    resultados r = new resultados(estado.mi_score,
+                    resultados r = new resultados(
+                        estado.mi_score,
                         estado.total_preguntas,
                         nombreJugador,
                         idPartida,
                         salaId,
                         jugadorId,
                         estado.ganador,
-                        estado.puntaje_ganador
+                        estado.puntaje_ganador,
+                        client,
+                        reader,
+                        writer
                     );
 
                     r.Show();
+
                     this.Close();
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Console.WriteLine("Error: " + ex.Message);
             }
@@ -143,7 +165,14 @@ namespace BDGameQuiz
                 );
 
                 if (r == DialogResult.Yes)
-                    Application.Exit();
+                    try
+                    {
+                        writer?.Close();
+                        reader?.Close();
+                        client?.Close();
+                    }
+                    catch { }
+                Application.Exit();
 
                 return true;
             }

@@ -1,17 +1,16 @@
 ﻿using System;
-using System.Drawing;
-using System.Net.Http;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using Newtonsoft.Json;
+using System.Net.Sockets;
+using System.IO;
 
 namespace BDGameQuiz
 {
     public partial class Inicio : Form
     {
-        private const string API = "http://192.168.56.1:8080";
-
+        TcpClient client;
+        StreamReader reader;
+        StreamWriter writer;
         public Inicio()
         {
             InitializeComponent();
@@ -35,34 +34,28 @@ namespace BDGameQuiz
             public int sala_id { get; set; }
         }
 
-        private async void btnUnirse_Click_1(object sender, EventArgs e)
+        private async void button1_Click(object sender, EventArgs e)
         {
+            await ConectarSocket();
+
             string nombreJugador = nameTextBox.Text;
 
-            if (string.IsNullOrWhiteSpace(textBox1.Text))
-            {
-                MessageBox.Show("Ingresa el ID de la sala");
-                return;
-            }
+            int jugadorId = await CrearOObtenerJugador(nombreJugador);
 
-            if (!int.TryParse(textBox1.Text, out int salaId))
-            {
-                MessageBox.Show("ID de sala inválido");
-                return;
-            }
+            int salaId = await CrearSala(jugadorId);
 
-            var jugador = await CrearOObtenerJugador(nombreJugador);
+            Lobby lobby = new Lobby(
+                salaId,
+                jugadorId,
+                true,
+                nombreJugador,
+                client,
+                reader,
+                writer
+            );
 
-            string result = await UnirseASala(salaId, jugador.id);
-
-            if (result != "OK")
-            {
-                MessageBox.Show(result);
-                return;
-            }
-
-            Lobby lobby = new Lobby(salaId, jugador.id, false, nombreJugador);
             lobby.Show();
+
             this.Hide();
         }
 
@@ -87,60 +80,35 @@ namespace BDGameQuiz
         }
 
 
-        async Task<Jugador> CrearOObtenerJugador(string nombre)
+        private async Task<int> CrearOObtenerJugador(string nombre)
         {
-            using (HttpClient client = new HttpClient())
-            {
-                var jugador = new { nombre = nombre };
+            await writer.WriteLineAsync($"CREATE_PLAYER|{nombre}");
 
-                string json = JsonConvert.SerializeObject(jugador);
+            string respuesta = await reader.ReadLineAsync();
 
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
+            string[] partes = respuesta.Split('|');
 
-                var response = await client.PostAsync($"{API}/players", content);
-
-                var responseJson = await response.Content.ReadAsStringAsync();
-
-                return JsonConvert.DeserializeObject<Jugador>(responseJson);
-            }
+            return int.Parse(partes[1]);
         }
 
-        async Task<SalaResponse> CrearSala(int jugadorId)
+        private async Task<int> CrearSala(int jugadorId)
         {
-            using (HttpClient client = new HttpClient())
-            {
-                var data = new { jugador_id = jugadorId };
+            await writer.WriteLineAsync($"CREATE_ROOM|{jugadorId}");
 
-                string json = JsonConvert.SerializeObject(data);
+            string respuesta = await reader.ReadLineAsync();
 
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
+            string[] partes = respuesta.Split('|');
 
-                var response = await client.PostAsync($"{API}/rooms", content);
-
-                var responseJson = await response.Content.ReadAsStringAsync();
-                return JsonConvert.DeserializeObject<SalaResponse>(responseJson);
-            }
+            return int.Parse(partes[1]);
         }
 
         async Task<string> UnirseASala(int salaId, int jugadorId)
         {
-            using (HttpClient client = new HttpClient())
-            {
-                var data = new { jugador_id = jugadorId };
+            await writer.WriteLineAsync($"JOIN_ROOM|{salaId}|{jugadorId}");
 
-                string json = JsonConvert.SerializeObject(data);
+            string respuesta = await reader.ReadLineAsync();
 
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                var response = await client.PostAsync($"{API}/rooms/{salaId}/join", content);
-
-                string body = await response.Content.ReadAsStringAsync();
-
-                if (response.IsSuccessStatusCode)
-                    return "OK";
-
-                return body;
-            }
+            return respuesta;
         }
 
         private void ValidarInputs()
@@ -150,6 +118,21 @@ namespace BDGameQuiz
 
             button1.Enabled = nombreOk;
             btnUnirse.Enabled = nombreOk && salaOk;
+        }
+
+        private async Task ConectarSocket()
+        {
+            client = new TcpClient();
+
+            await client.ConnectAsync("192.168.56.1", 5000);
+
+            NetworkStream stream = client.GetStream();
+
+            reader = new StreamReader(stream);
+
+            writer = new StreamWriter(stream);
+
+            writer.AutoFlush = true;
         }
 
         private void nameTextBox_TextChanged(object sender, EventArgs e)
@@ -173,16 +156,36 @@ namespace BDGameQuiz
         {
         }
 
-        private async void button1_Click(object sender, EventArgs e)
+        private async void btnUnirse_Click_1(object sender, EventArgs e)
         {
+            await ConectarSocket();
+
             string nombreJugador = nameTextBox.Text;
 
-            var jugador = await CrearOObtenerJugador(nombreJugador);
+            int jugadorId = await CrearOObtenerJugador(nombreJugador);
 
-            var sala = await CrearSala(jugador.id);
+            int salaId = int.Parse(textBox1.Text);
 
-            Lobby lobby = new Lobby(sala.sala_id, jugador.id, true, nombreJugador);
+            string result = await UnirseASala(salaId, jugadorId);
+
+            if (result != "OK")
+            {
+                MessageBox.Show(result);
+                return;
+            }
+
+            Lobby lobby = new Lobby(
+                salaId,
+                jugadorId,
+                false,
+                nombreJugador,
+                client,
+                reader,
+                writer
+            );
+
             lobby.Show();
+
             this.Hide();
         }
 

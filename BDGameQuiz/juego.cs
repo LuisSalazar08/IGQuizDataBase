@@ -4,12 +4,12 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
-using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using WMPLib;
+using System.Net.Sockets;
+using System.IO;
 
 namespace BDGameQuiz
 {
@@ -46,11 +46,12 @@ namespace BDGameQuiz
         private readonly Font fontError = new Font("Arial", 13, FontStyle.Bold);
 
         private static readonly Random rnd = new Random();
-        private static readonly HttpClient httpClient = new HttpClient();
-        private const string API_BASE_URL = "http://192.168.56.1:8080";
 
         private int salaId;
         private bool esHost;
+        TcpClient client;
+        StreamReader reader;
+        StreamWriter writer;
 
         public juego(int cat, int idJugador, string nombreJugador, int salaId, bool esHost)
         {
@@ -75,8 +76,29 @@ namespace BDGameQuiz
             this.Resize += Juego_Resize;
             this.Disposed += Juego_Disposed;
 
-            Task.Run(async () => await CrearPartidaAsync()).Wait();
-            Task.Run(async () => await CargarPreguntasAsync()).Wait();
+            Task.Run(async () =>
+            {
+                await ConectarSocket();
+
+                await CrearPartida();
+
+                await CargarPreguntas();
+
+            }).Wait();
+        }
+        private async Task ConectarSocket()
+        {
+            client = new TcpClient();
+
+            await client.ConnectAsync("192.168.56.1", 5000);
+
+            NetworkStream stream = client.GetStream();
+
+            reader = new StreamReader(stream);
+
+            writer = new StreamWriter(stream);
+
+            writer.AutoFlush = true;
         }
 
         private Image ObtenerFondoPorCategoria()
@@ -132,6 +154,13 @@ namespace BDGameQuiz
 
                 if (result == DialogResult.Yes)
                 {
+                    try
+                    {
+                        writer?.Close();
+                        reader?.Close();
+                        client?.Close();
+                    }
+                    catch { }
                     Application.Exit();
                 }
                 return true;
@@ -215,50 +244,36 @@ namespace BDGameQuiz
             }
         }
 
-        private async Task CargarPreguntasAsync()
+        private async Task CargarPreguntas()
         {
             preguntas.Clear();
 
-            try
-            {
-                string url = $"{API_BASE_URL}/questions/?cat={idCategoria}";
-                HttpResponseMessage response = await httpClient.GetAsync(url);
+            await writer.WriteLineAsync($"GET_QUESTIONS|{idCategoria}");
 
-                if (response.IsSuccessStatusCode)
+            string respuesta = await reader.ReadLineAsync();
+
+            string json = respuesta.Substring(10);
+
+            preguntas = JsonSerializer.Deserialize<List<PreguntaAPI>>(
+                json,
+                new JsonSerializerOptions
                 {
-                    string json = await response.Content.ReadAsStringAsync();
-                    var preguntasTemp = JsonSerializer.Deserialize<List<PreguntaAPI>>(json, new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    });
-
-                    if (preguntasTemp != null)
-                    {
-                        foreach (var p in preguntasTemp)
-                        {
-                            p.Tipo = DetectarTipoPregunta(p);
-                            MezclarOpciones(p);
-                            preguntas.Add(p);
-                        }
-                    }
+                    PropertyNameCaseInsensitive = true
                 }
+            );
 
-                if (preguntas.Count == 0)
-                {
-                    MessageBox.Show($"No hay preguntas disponibles para esta categoría (ID: {idCategoria}).");
-                    VolverAlLobby();
-                    return;
-                }
-
-                indicePregunta = 0;
-                score = 0;
-                MostrarPregunta();
-            }
-            catch (Exception ex)
+            foreach (var p in preguntas)
             {
-                MessageBox.Show("Error al cargar preguntas: " + ex.Message);
-                VolverAlLobby();
+                p.Tipo = DetectarTipoPregunta(p);
+
+                MezclarOpciones(p);
             }
+
+            indicePregunta = 0;
+
+            score = 0;
+
+            MostrarPregunta();
         }
 
         private string DetectarTipoPregunta(PreguntaAPI p)
@@ -339,7 +354,8 @@ namespace BDGameQuiz
 
             try { player.controls.stop(); } catch { }
 
-            Lobby lobby = new Lobby(salaId, idJugador, esHost, nombreJugador);
+            Lobby lobby = new Lobby(salaId,idJugador,esHost,nombreJugador,client,reader,writer);
+
             lobby.Show();
 
             this.Close();
@@ -640,7 +656,7 @@ namespace BDGameQuiz
                 score++;
             }
 
-            await EnviarRespuestaAsync(preguntaActual.Id, opcion);
+            await EnviarRespuesta(preguntaActual.Id, opcion);
 
             Timer timer = new Timer();
             timer.Interval = 800;
@@ -663,73 +679,33 @@ namespace BDGameQuiz
             timer.Start();
         }
 
-        private async Task EnviarRespuestaAsync(int idPregunta, int opcion)
+        private async Task EnviarRespuesta(int idPregunta, int opcion)
         {
-            try
-            {
-                var preguntaActual = preguntas[indicePregunta];
+            bool correcto =
+                opcion == preguntas[indicePregunta].Correcta;
 
-                var answerData = new
-                {
-                    pregunta_id = idPregunta,
-                    opcion = opcion,
-                    es_correcto = opcion == preguntaActual.Correcta
-                };
+            await writer.WriteLineAsync(
+                $"ANSWER|" +
+                $"{idPartida}|" +
+                $"{idPregunta}|" +
+                $"{opcion}|" +
+                $"{correcto}"
+            );
 
-                string json = JsonSerializer.Serialize(answerData);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                Console.WriteLine($"ID PARTIDA: {idPartida}");
-                Console.WriteLine($"Enviando JSON: {json}");
-
-                var response = await httpClient.PostAsync(
-                    $"{API_BASE_URL}/games/{idPartida}/answer",
-                    content
-                );
-
-                Console.WriteLine("Status: " + response.StatusCode);
-
-                string responseBody = await response.Content.ReadAsStringAsync();
-                Console.WriteLine("Response: " + responseBody);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error al enviar respuesta: " + ex.Message);
-            }
+            await reader.ReadLineAsync();
         }
 
-        private async Task CrearPartidaAsync()
+        private async Task CrearPartida()
         {
-            try
-            {
-                var partidaData = new
-                {
-                    jugador_id = idJugador,
-                    categoria_id = idCategoria,
-                    sala_id = salaId,
-                    puntaje = 0
-                };
+            await writer.WriteLineAsync(
+                $"CREATE_GAME|{idJugador}|{idCategoria}|{salaId}"
+            );
 
-                string json = JsonSerializer.Serialize(partidaData);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
+            string respuesta = await reader.ReadLineAsync();
 
-                HttpResponseMessage response = await httpClient.PostAsync($"{API_BASE_URL}/games/", content);
+            string[] partes = respuesta.Split('|');
 
-                if (response.IsSuccessStatusCode)
-                {
-                    string responseJson = await response.Content.ReadAsStringAsync();
-                    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                    var partidaCreada = JsonSerializer.Deserialize<PartidaResponse>(responseJson, options);
-
-                    if (partidaCreada != null)
-                        idPartida = partidaCreada.Id;
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error al crear la partida: " + ex.Message);
-                idPartida = 0;
-            }
+            idPartida = int.Parse(partes[1]);
         }
 
         private void TerminarJuego()
@@ -738,7 +714,15 @@ namespace BDGameQuiz
 
             try { player.controls.stop(); } catch { }
 
-            EsperaFinal espera = new EsperaFinal(idPartida, nombreJugador, idJugador, salaId);
+            EsperaFinal espera = new EsperaFinal(
+                idPartida,
+                nombreJugador,
+                idJugador,
+                salaId,
+                client,
+                reader,
+                writer
+            );
             espera.Show();
             this.Close();
 
