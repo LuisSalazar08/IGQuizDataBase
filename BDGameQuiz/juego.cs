@@ -49,9 +49,6 @@ namespace BDGameQuiz
 
         private int salaId;
         private bool esHost;
-        TcpClient client;
-        StreamReader reader;
-        StreamWriter writer;
 
         public juego(int cat, int idJugador, string nombreJugador, int salaId, bool esHost)
         {
@@ -75,30 +72,17 @@ namespace BDGameQuiz
             this.Load += Juego_Load;
             this.Resize += Juego_Resize;
             this.Disposed += Juego_Disposed;
-
-            Task.Run(async () =>
+            
+            this.Load += async (s, e) =>
             {
-                await ConectarSocket();
-
                 await CrearPartida();
 
                 await CargarPreguntas();
 
-            }).Wait();
-        }
-        private async Task ConectarSocket()
-        {
-            client = new TcpClient();
+                CalcularLayout();
 
-            await client.ConnectAsync("192.168.56.1", 5000);
-
-            NetworkStream stream = client.GetStream();
-
-            reader = new StreamReader(stream);
-
-            writer = new StreamWriter(stream);
-
-            writer.AutoFlush = true;
+                Invalidate();
+            };
         }
 
         private Image ObtenerFondoPorCategoria()
@@ -145,24 +129,20 @@ namespace BDGameQuiz
         {
             if (keyData == Keys.Escape)
             {
-                DialogResult result = MessageBox.Show(
-                    "Quieres Salir del Juego?",
-                    "Exit",
+                var result = MessageBox.Show(
+                    "¿Quieres salir del juego?",
+                    "Salir",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Question
                 );
 
                 if (result == DialogResult.Yes)
                 {
-                    try
-                    {
-                        writer?.Close();
-                        reader?.Close();
-                        client?.Close();
-                    }
-                    catch { }
+                    Conexion.Cerrar();
+
                     Application.Exit();
                 }
+
                 return true;
             }
 
@@ -248,9 +228,9 @@ namespace BDGameQuiz
         {
             preguntas.Clear();
 
-            await writer.WriteLineAsync($"GET_QUESTIONS|{idCategoria}");
+            await Conexion.writer.WriteLineAsync($"GET_QUESTIONS|{idCategoria}");
 
-            string respuesta = await reader.ReadLineAsync();
+            string respuesta = await Conexion.reader.ReadLineAsync();
 
             string json = respuesta.Substring(10);
 
@@ -354,7 +334,7 @@ namespace BDGameQuiz
 
             try { player.controls.stop(); } catch { }
 
-            Lobby lobby = new Lobby(salaId,idJugador,esHost,nombreJugador,client,reader,writer);
+            Lobby lobby = new Lobby(salaId,idJugador,esHost,nombreJugador);
 
             lobby.Show();
 
@@ -684,7 +664,7 @@ namespace BDGameQuiz
             bool correcto =
                 opcion == preguntas[indicePregunta].Correcta;
 
-            await writer.WriteLineAsync(
+            await Conexion.writer.WriteLineAsync(
                 $"ANSWER|" +
                 $"{idPartida}|" +
                 $"{idPregunta}|" +
@@ -692,16 +672,16 @@ namespace BDGameQuiz
                 $"{correcto}"
             );
 
-            await reader.ReadLineAsync();
+            await Conexion.reader.ReadLineAsync();
         }
 
         private async Task CrearPartida()
         {
-            await writer.WriteLineAsync(
+            await Conexion.writer.WriteLineAsync(
                 $"CREATE_GAME|{idJugador}|{idCategoria}|{salaId}"
             );
 
-            string respuesta = await reader.ReadLineAsync();
+            string respuesta = await Conexion.reader.ReadLineAsync();
 
             string[] partes = respuesta.Split('|');
 
@@ -718,10 +698,7 @@ namespace BDGameQuiz
                 idPartida,
                 nombreJugador,
                 idJugador,
-                salaId,
-                client,
-                reader,
-                writer
+                salaId
             );
             espera.Show();
             this.Close();

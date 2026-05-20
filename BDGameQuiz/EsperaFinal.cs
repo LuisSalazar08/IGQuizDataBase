@@ -19,13 +19,11 @@ namespace BDGameQuiz
         private readonly Font fontSub = new Font("Arial", 18, FontStyle.Regular);
         private int jugadorId;
         private int salaId;
+        private bool consultando = false;
 
         private bool todosListos = false;
-        TcpClient client;
-        StreamReader reader;
-        StreamWriter writer;
 
-        public EsperaFinal(int idPartida,string nombreJugador,int jugadorId,int salaId,TcpClient client,StreamReader reader,StreamWriter writer)
+        public EsperaFinal(int idPartida, string nombreJugador, int jugadorId, int salaId)
         {
             InitializeComponent();
 
@@ -33,9 +31,6 @@ namespace BDGameQuiz
             this.nombreJugador = nombreJugador;
             this.jugadorId = jugadorId;
             this.salaId = salaId;
-            this.client = client;
-            this.reader = reader;
-            this.writer = writer;
 
             this.WindowState = FormWindowState.Maximized;
             this.FormBorderStyle = FormBorderStyle.None;
@@ -62,13 +57,16 @@ namespace BDGameQuiz
 
         private async Task RevisarEstado()
         {
-            try
+            if (consultando)
+                return;
+
+            consultando = true;            try
             {
-                await writer.WriteLineAsync(
+                await Conexion.writer.WriteLineAsync(
                     $"GAME_STATUS|{idPartida}"
                 );
 
-                string respuesta = await reader.ReadLineAsync();
+                string respuesta = await Conexion.reader.ReadLineAsync();
 
                 string[] partes = respuesta.Split('|');
 
@@ -104,10 +102,7 @@ namespace BDGameQuiz
                         salaId,
                         jugadorId,
                         estado.ganador,
-                        estado.puntaje_ganador,
-                        client,
-                        reader,
-                        writer
+                        estado.puntaje_ganador
                     );
 
                     r.Show();
@@ -118,6 +113,10 @@ namespace BDGameQuiz
             catch (Exception ex)
             {
                 Console.WriteLine("Error: " + ex.Message);
+            }
+            finally
+            {
+                consultando = false;
             }
         }
 
@@ -153,26 +152,31 @@ namespace BDGameQuiz
             g.DrawString(estado, fontSub, Brushes.LightGray, cx, cy + 60, sf);
         }
 
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            timer?.Stop();
+            timer?.Dispose();
+
+            base.OnFormClosing(e);
+        }
+
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
             if (keyData == Keys.Escape)
             {
-                var r = MessageBox.Show(
-                    "¿Salir del juego?",
+                var result = MessageBox.Show(
+                    "¿Quieres salir del juego?",
                     "Salir",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Question
                 );
 
-                if (r == DialogResult.Yes)
-                    try
-                    {
-                        writer?.Close();
-                        reader?.Close();
-                        client?.Close();
-                    }
-                    catch { }
-                Application.Exit();
+                if (result == DialogResult.Yes)
+                {
+                    Conexion.Cerrar();
+
+                    Application.Exit();
+                }
 
                 return true;
             }

@@ -12,9 +12,6 @@ namespace BDGameQuiz
     {
         private int salaId;
         private int jugadorId;
-        TcpClient client;
-        StreamReader reader;
-        StreamWriter writer;
 
         private List<Categoria> categorias = new List<Categoria>();
 
@@ -44,31 +41,23 @@ namespace BDGameQuiz
 
                 if (result == DialogResult.Yes)
                 {
-                    try
-                    {
-                        writer?.Close();
-                        reader?.Close();
-                        client?.Close();
-                    }
-                    catch { }
+                    Conexion.Cerrar();
+
                     Application.Exit();
                 }
+
                 return true;
             }
 
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
-        public MenuCategorias(int salaId,int jugadorId,TcpClient client,StreamReader reader,StreamWriter writer)
+        public MenuCategorias(int salaId, int jugadorId)
         {
             InitializeComponent();
 
             this.salaId = salaId;
             this.jugadorId = jugadorId;
-
-            this.client = client;
-            this.reader = reader;
-            this.writer = writer;
 
             this.WindowState = FormWindowState.Maximized;
             this.FormBorderStyle = FormBorderStyle.None;
@@ -88,9 +77,9 @@ namespace BDGameQuiz
         {
             try
             {
-                await writer.WriteLineAsync("GET_CATEGORIES");
+                await Conexion.writer.WriteLineAsync("GET_CATEGORIES");
 
-                string respuesta = await reader.ReadLineAsync();
+                string respuesta = await Conexion.reader.ReadLineAsync();
 
                 categorias.Clear();
 
@@ -255,11 +244,11 @@ namespace BDGameQuiz
         {
             try
             {
-                await writer.WriteLineAsync(
+                await Conexion.writer.WriteLineAsync(
                     $"SET_CATEGORY|{salaId}|{jugadorId}|{categoriaId}"
                 );
 
-                string respuesta = await reader.ReadLineAsync();
+                string respuesta = await Conexion.reader.ReadLineAsync();
 
                 if (respuesta != "OK")
                 {

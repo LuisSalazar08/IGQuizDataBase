@@ -19,9 +19,7 @@ namespace BDGameQuiz
 		private int _prevListos = -1;
 		private string _prevCategoria = null;
         private string nombreJugador;
-        TcpClient client;
-        StreamReader reader;
-        StreamWriter writer;
+        private bool consultando = false;
 
         private Timer timer;
 
@@ -46,14 +44,8 @@ namespace BDGameQuiz
 
                 if (result == DialogResult.Yes)
                 {
+                    Conexion.Cerrar();
 
-                    try
-                    {
-                        writer?.Close();
-                        reader?.Close();
-                        client?.Close();
-                    }
-                    catch { }
                     Application.Exit();
                 }
 
@@ -61,10 +53,9 @@ namespace BDGameQuiz
             }
 
             return base.ProcessCmdKey(ref msg, keyData);
-
         }
 
-        public Lobby(int salaId,int jugadorId,bool esHost,string nombreJugador,TcpClient client,StreamReader reader,StreamWriter writer)
+        public Lobby(int salaId, int jugadorId, bool esHost, string nombreJugador)
         {
             InitializeComponent();
 
@@ -72,9 +63,6 @@ namespace BDGameQuiz
             this.jugadorId = jugadorId;
             this.esHost = esHost;
             this.nombreJugador = nombreJugador;
-            this.client = client;
-            this.reader = reader;
-            this.writer = writer;
 
             this.DoubleBuffered = true;
 			this.SetStyle(
@@ -110,11 +98,16 @@ namespace BDGameQuiz
 
         private async Task ObtenerEstadoSala()
         {
+            if (consultando)
+                return;
+
+            consultando = true;
+
             try
             {
-                await writer.WriteLineAsync($"ROOM_STATUS|{salaId}");
+                await Conexion.writer.WriteLineAsync($"ROOM_STATUS|{salaId}");
 
-                string respuesta = await reader.ReadLineAsync();
+                string respuesta = await Conexion.reader.ReadLineAsync();
 
                 string[] partes = respuesta.Split('|');
 
@@ -137,15 +130,15 @@ namespace BDGameQuiz
                         idCategoria = 1;
                     else if (categoriaActual == "Geografía")
                         idCategoria = 2;
-                    else if (categoriaActual == "Cultura")
+                    else if (categoriaActual == "Cultura y Tradiciones")
                         idCategoria = 3;
                     else if (categoriaActual == "Gastronomía")
                         idCategoria = 4;
-                    else if (categoriaActual == "Arte")
+                    else if (categoriaActual == "Arte y Entretenimiento")
                         idCategoria = 5;
                     else if (categoriaActual == "Deportes")
                         idCategoria = 6;
-                    else if (categoriaActual == "Naturaleza")
+                    else if (categoriaActual == "Naturaleza y Biodiversidad")
                         idCategoria = 7;
                     else
                         idCategoria = 1;
@@ -165,6 +158,10 @@ namespace BDGameQuiz
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
+            }
+            finally
+            {
+                consultando = false;
             }
         }
 
@@ -237,6 +234,13 @@ namespace BDGameQuiz
             }
         }
 
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            timer?.Stop();
+            timer?.Dispose();
+
+            base.OnFormClosing(e);
+        }
         private void DibujarBoton(Graphics g, Rectangle rect, string texto, Color colorBase)
         {
             Color color = hoverRect == rect
@@ -297,20 +301,20 @@ namespace BDGameQuiz
 
         private async Task MarcarListo()
         {
-            await writer.WriteLineAsync(
+            await Conexion.writer.WriteLineAsync(
                 $"READY|{salaId}|{jugadorId}"
             );
 
-            await reader.ReadLineAsync();
+            await Conexion.reader.ReadLineAsync();
         }
 
         private async Task IniciarPartida()
         {
-            await writer.WriteLineAsync(
+            await Conexion.writer.WriteLineAsync(
                 $"START_GAME|{salaId}|{jugadorId}"
             );
 
-            string respuesta = await reader.ReadLineAsync();
+            string respuesta = await Conexion.reader.ReadLineAsync();
 
             if (respuesta != "OK")
             {
@@ -324,7 +328,7 @@ namespace BDGameQuiz
         {
             timer.Stop();
 
-            MenuCategorias menu = new MenuCategorias(salaId, jugadorId, client, reader, writer);
+            MenuCategorias menu = new MenuCategorias(salaId, jugadorId);
             menu.ShowDialog();
 
             timer.Start();

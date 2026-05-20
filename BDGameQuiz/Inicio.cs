@@ -8,9 +8,6 @@ namespace BDGameQuiz
 {
     public partial class Inicio : Form
     {
-        TcpClient client;
-        StreamReader reader;
-        StreamWriter writer;
         public Inicio()
         {
             InitializeComponent();
@@ -44,14 +41,10 @@ namespace BDGameQuiz
 
             int salaId = await CrearSala(jugadorId);
 
-            Lobby lobby = new Lobby(
-                salaId,
+            Lobby lobby = new Lobby(salaId,
                 jugadorId,
                 true,
-                nombreJugador,
-                client,
-                reader,
-                writer
+                nombreJugador
             );
 
             lobby.Show();
@@ -71,7 +64,11 @@ namespace BDGameQuiz
                 );
 
                 if (result == DialogResult.Yes)
+                {
+                    Conexion.Cerrar();
+
                     Application.Exit();
+                }
 
                 return true;
             }
@@ -82,9 +79,9 @@ namespace BDGameQuiz
 
         private async Task<int> CrearOObtenerJugador(string nombre)
         {
-            await writer.WriteLineAsync($"CREATE_PLAYER|{nombre}");
+            await Conexion.writer.WriteLineAsync($"CREATE_PLAYER|{nombre}");
 
-            string respuesta = await reader.ReadLineAsync();
+            string respuesta = await Conexion.reader.ReadLineAsync();
 
             string[] partes = respuesta.Split('|');
 
@@ -93,9 +90,9 @@ namespace BDGameQuiz
 
         private async Task<int> CrearSala(int jugadorId)
         {
-            await writer.WriteLineAsync($"CREATE_ROOM|{jugadorId}");
+            await Conexion.writer.WriteLineAsync($"CREATE_ROOM|{jugadorId}");
 
-            string respuesta = await reader.ReadLineAsync();
+            string respuesta = await Conexion.reader.ReadLineAsync();
 
             string[] partes = respuesta.Split('|');
 
@@ -104,9 +101,9 @@ namespace BDGameQuiz
 
         async Task<string> UnirseASala(int salaId, int jugadorId)
         {
-            await writer.WriteLineAsync($"JOIN_ROOM|{salaId}|{jugadorId}");
+            await Conexion.writer.WriteLineAsync($"JOIN_ROOM|{salaId}|{jugadorId}");
 
-            string respuesta = await reader.ReadLineAsync();
+            string respuesta = await Conexion.reader.ReadLineAsync();
 
             return respuesta;
         }
@@ -122,17 +119,20 @@ namespace BDGameQuiz
 
         private async Task ConectarSocket()
         {
-            client = new TcpClient();
+            if (Conexion.client != null && Conexion.client.Connected)
+                return;
 
-            await client.ConnectAsync("192.168.56.1", 5000);
+            Conexion.client = new TcpClient();
 
-            NetworkStream stream = client.GetStream();
+            await Conexion.client.ConnectAsync("192.168.56.1", 5000);
 
-            reader = new StreamReader(stream);
+            NetworkStream stream = Conexion.client.GetStream();
 
-            writer = new StreamWriter(stream);
+            Conexion.reader = new StreamReader(stream);
 
-            writer.AutoFlush = true;
+            Conexion.writer = new StreamWriter(stream);
+
+            Conexion.writer.AutoFlush = true;
         }
 
         private void nameTextBox_TextChanged(object sender, EventArgs e)
@@ -177,11 +177,8 @@ namespace BDGameQuiz
             Lobby lobby = new Lobby(
                 salaId,
                 jugadorId,
-                false,
-                nombreJugador,
-                client,
-                reader,
-                writer
+                true,
+                nombreJugador
             );
 
             lobby.Show();

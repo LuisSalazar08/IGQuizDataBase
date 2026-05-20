@@ -16,11 +16,8 @@ namespace BDGameQuiz
         bool todosListos = false;
         string ganador;
         int puntajeGanador;
-        TcpClient client;
-        StreamReader reader;
-        StreamWriter writer;
 
-        public resultados(int scoreFinal, int totalPreguntas, string nombreJugador,int idPartida, int salaId, int jugadorId,string ganador, int puntajeGanador, TcpClient client,StreamReader reader,StreamWriter writer)
+        public resultados(int scoreFinal, int totalPreguntas, string nombreJugador,int idPartida, int salaId, int jugadorId,string ganador, int puntajeGanador)
 		{
 			InitializeComponent();
 
@@ -29,9 +26,6 @@ namespace BDGameQuiz
 			this.nombreJugador = nombreJugador;
             this.ganador = ganador;
             this.puntajeGanador = puntajeGanador; 
-            this.client = client;
-            this.reader = reader;
-            this.writer = writer;
 
             this.WindowState = FormWindowState.Maximized;
 			this.DoubleBuffered = true;
@@ -57,30 +51,29 @@ namespace BDGameQuiz
         {
             if (keyData == Keys.Escape)
             {
-                try
+                var result = MessageBox.Show(
+                    "¿Quieres salir del juego?",
+                    "Salir",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question
+                );
+
+                if (result == DialogResult.Yes)
                 {
-                    writer?.Close();
-                    reader?.Close();
-                    client?.Close();
+                    Conexion.Cerrar();
+
+                    Application.Exit();
                 }
-                catch { }
-                Inicio inicio = new Inicio();
-                inicio.Show();
-                this.Close();
+
                 return true;
             }
+
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
         private void btnMenu_Click_1(object sender, EventArgs e)
         {
-            try
-            {
-                writer?.Close();
-                reader?.Close();
-                client?.Close();
-            }
-            catch { }
+            
 
             Inicio inicio = new Inicio();
 
